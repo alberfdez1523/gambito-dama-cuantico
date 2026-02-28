@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ChessAI — Juega contra Stockfish</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>♛</text></svg>">
+</head>
+<body>
+    <div id="app">
+        <!-- ═══════════════════════════════════════════
+             START MENU
+             ═══════════════════════════════════════════ -->
+        <div id="startMenu" class="start-menu">
+            <div class="start-bg-pieces" aria-hidden="true">
+                <span>♜</span><span>♞</span><span>♝</span><span>♛</span>
+                <span>♚</span><span>♝</span><span>♞</span><span>♜</span>
+            </div>
+            <div class="start-card">
+                <div class="start-logo">
+                    <span class="start-logo-icon">♛</span>
+                    <h1>Chess<span class="accent">AI</span></h1>
+                    <p class="start-sub">Powered by Stockfish 17 — Motor local</p>
+                </div>
+
+                <!-- Color -->
+                <div class="start-section">
+                    <label class="start-label">Elige tu color</label>
+                    <div class="color-picker" id="colorPicker">
+                        <button class="color-opt active" data-color="w">
+                            <span class="co-piece">♔</span>
+                            <span class="co-name">Blancas</span>
+                        </button>
+                        <button class="color-opt" data-color="random">
+                            <span class="co-piece">🎲</span>
+                            <span class="co-name">Azar</span>
+                        </button>
+                        <button class="color-opt" data-color="b">
+                            <span class="co-piece">♚</span>
+                            <span class="co-name">Negras</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Difficulty -->
+                <div class="start-section">
+                    <label class="start-label">Nivel de dificultad</label>
+                    <div class="diff-grid" id="diffGrid">
+                        <button class="diff-opt" data-diff="beginner">
+                            <span class="diff-icon">🟢</span>
+                            <span class="diff-name">Principiante</span>
+                            <span class="diff-elo">~800 ELO</span>
+                        </button>
+                        <button class="diff-opt" data-diff="easy">
+                            <span class="diff-icon">🟡</span>
+                            <span class="diff-name">Fácil</span>
+                            <span class="diff-elo">~1200 ELO</span>
+                        </button>
+                        <button class="diff-opt active" data-diff="medium">
+                            <span class="diff-icon">🟠</span>
+                            <span class="diff-name">Medio</span>
+                            <span class="diff-elo">~1600 ELO</span>
+                        </button>
+                        <button class="diff-opt" data-diff="hard">
+                            <span class="diff-icon">🔴</span>
+                            <span class="diff-name">Difícil</span>
+                            <span class="diff-elo">~2000 ELO</span>
+                        </button>
+                        <button class="diff-opt" data-diff="master">
+                            <span class="diff-icon">💀</span>
+                            <span class="diff-name">Maestro</span>
+                            <span class="diff-elo">~2600 ELO</span>
+                        </button>
+                    </div>
+                </div>
+
+                <button id="startPlayBtn" class="btn btn-play">
+                    <span class="play-icon">▶</span> Jugar
+                </button>
+
+                <div class="start-server-status" id="serverStatus">
+                    <span class="ss-dot loading"></span>
+                    <span class="ss-text">Conectando al motor…</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- ═══════════════════════════════════════════
+             GAME SCREEN
+             ═══════════════════════════════════════════ -->
+        <div id="gameScreen" class="game-screen hidden">
+            <header class="header">
+                <div class="logo">
+                    <span class="logo-icon">♛</span>
+                    <div class="logo-text">
+                        <h1>Chess<span class="accent">AI</span></h1>
+                        <span class="logo-sub">Powered by Stockfish</span>
+                    </div>
+                </div>
+                <div class="header-controls">
+                    <div class="game-badge" id="gameBadge">
+                        <span id="badgeDiff">🟠 Medio</span>
+                        <span class="badge-sep">·</span>
+                        <span id="badgeColor">Blancas</span>
+                    </div>
+                    <button id="newGameBtn" class="btn btn-primary">
+                        <span>⟳</span> Nueva Partida
+                    </button>
+                </div>
+            </header>
+
+            <main class="game-area">
+                <div class="board-col">
+                    <div class="player-bar top-bar" id="topBar">
+                        <div class="player-info">
+                            <div class="avatar ai-avatar">
+                                <span class="avatar-icon">🤖</span>
+                                <div class="thinking-dots" id="thinkingIndicator">
+                                    <i></i><i></i><i></i>
+                                </div>
+                            </div>
+                            <div class="player-details">
+                                <span class="player-name" id="topName">Stockfish AI</span>
+                                <span class="player-elo" id="topElo">ELO ~1600</span>
+                            </div>
+                        </div>
+                        <div class="captures-row">
+                            <div class="captured-pieces" id="topCaptures"></div>
+                            <span class="mat-diff" id="topAdvantage"></span>
+                        </div>
+                    </div>
+
+                    <div class="board-frame">
+                        <div class="board" id="board"></div>
+                    </div>
+
+                    <div class="player-bar bottom-bar" id="bottomBar">
+                        <div class="player-info">
+                            <div class="avatar human-avatar">
+                                <span class="avatar-icon">👤</span>
+                            </div>
+                            <div class="player-details">
+                                <span class="player-name" id="bottomName">Tú</span>
+                                <span class="player-elo" id="bottomElo">Jugador</span>
+                            </div>
+                        </div>
+                        <div class="captures-row">
+                            <div class="captured-pieces" id="bottomCaptures"></div>
+                            <span class="mat-diff" id="bottomAdvantage"></span>
+                        </div>
+                    </div>
+                </div>
+
+                <aside class="side-panel">
+                    <div class="panel-section history-section">
+                        <h3 class="panel-title"><span>📋</span> Historial</h3>
+                        <div class="move-list" id="moveHistory">
+                            <div class="move-empty">La partida aún no ha comenzado</div>
+                        </div>
+                    </div>
+
+                    <div class="panel-section">
+                        <h3 class="panel-title"><span>🎯</span> Probabilidades</h3>
+                        <div class="chances-wrap">
+                            <div class="chances-bar">
+                                <div class="chances-fill chances-white" id="chanceWhite" style="width:33.3%"></div>
+                                <div class="chances-fill chances-draw" id="chanceDraw" style="width:33.4%"></div>
+                                <div class="chances-fill chances-black" id="chanceBlack" style="width:33.3%"></div>
+                            </div>
+                            <div class="chances-labels">
+                                <span class="chance-label" id="chanceLabelWhite">⬜ 33%</span>
+                                <span class="chance-label chance-label-draw" id="chanceLabelDraw">🤝 34%</span>
+                                <span class="chance-label" id="chanceLabelBlack">⬛ 33%</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="panel-section">
+                        <h3 class="panel-title"><span>⚡</span> Acciones</h3>
+                        <div class="action-grid">
+                            <button id="undoBtn" class="btn btn-sec">↩ Deshacer</button>
+                            <button id="flipBtn" class="btn btn-sec">🔄 Girar</button>
+                            <button id="resignBtn" class="btn btn-danger">🏳️ Rendirse</button>
+                        </div>
+                    </div>
+
+                    <div class="panel-section">
+                        <h3 class="panel-title"><span>🎵</span> Música ambiente</h3>
+                        <div class="music-control">
+                            <button id="musicToggleBtn" class="btn btn-sec music-toggle-btn">▶ Reproducir</button>
+                            <div class="volume-row">
+                                <span class="vol-icon">🔈</span>
+                                <input type="range" id="musicVolume" class="volume-slider" min="0" max="100" value="50">
+                                <span class="vol-icon">🔊</span>
+                            </div>
+                        </div>
+                    </div>
+                </aside>
+            </main>
+
+            <div class="status-bar" id="statusBar">
+                <span class="status-dot your-turn"></span>
+                <span class="status-text">Tu turno</span>
+            </div>
+        </div>
+
+        <!-- Promotion Modal -->
+        <div class="overlay" id="promotionModal">
+            <div class="modal promo-modal">
+                <h3>Promoción de peón</h3>
+                <p>Elige una pieza:</p>
+                <div class="promo-choices" id="promotionOptions"></div>
+            </div>
+        </div>
+
+        <!-- Game Over Modal -->
+        <div class="overlay" id="gameOverModal">
+            <div class="modal gameover-modal">
+                <div class="go-icon" id="gameOverIcon">♛</div>
+                <h2 id="gameOverTitle">Partida Terminada</h2>
+                <p id="gameOverMessage"></p>
+                <div class="modal-actions">
+                    <button id="modalNewGame" class="btn btn-primary">⟳ Nueva Partida</button>
+                    <button id="modalClose" class="btn btn-sec">Cerrar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>

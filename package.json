@@ -1,0 +1,10 @@
+{
+  "name": "chess-ia",
+  "version": "1.0.0",
+  "description": "Juega al ajedrez contra Stockfish AI en tu navegador",
+  "scripts": {
+    "start": "npx serve . -l 3000 --no-clipboard",
+    "dev": "npx live-server --port=3000"
+  },
+  "license": "MIT"
+}
