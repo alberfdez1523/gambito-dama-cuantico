@@ -1,6 +1,13 @@
 """
-ChessAI — FastAPI backend that wraps a local Stockfish engine.
-Run:  python server.py
+Backend de ChessAI.
+
+Este servicio hace 3 cosas:
+1) Levanta Stockfish localmente.
+2) Expone endpoints HTTP para pedir jugadas/evaluaciones.
+3) Sirve el frontend estático para jugar desde el navegador.
+
+Ejecución local:
+    python server.py
 """
 
 import os, sys, pathlib, json
@@ -14,24 +21,32 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
-# ─── Locate Stockfish binary ────────────────────────────
+# ---------------------------------------------------------------------------
+# Localización del binario de Stockfish
+# ---------------------------------------------------------------------------
 HERE = pathlib.Path(__file__).parent.resolve()
 
 def find_stockfish():
-    """Find stockfish binary: system paths first, then engine/ folder."""
+    """Busca el binario de Stockfish en rutas del sistema y en `engine/`.
+
+    Orden de búsqueda:
+    1. Rutas comunes del sistema (útil en Linux/Docker).
+    2. PATH.
+    3. Cualquier ejecutable compatible dentro de `engine/`.
+    """
     import shutil, platform
 
-    # Check common Linux system paths explicitly (for Docker)
+    # Rutas típicas en Linux (incluyendo muchos contenedores Docker).
     for system_path in ["/usr/games/stockfish", "/usr/bin/stockfish", "/usr/local/bin/stockfish"]:
         if os.path.isfile(system_path) and os.access(system_path, os.X_OK):
             return system_path
 
-    # Try PATH
+    # Si está en el PATH, usamos esa versión.
     sf = shutil.which("stockfish")
     if sf:
         return sf
 
-    # Then look in local engine/ folder for platform-matching binary
+    # Si no está en PATH, buscamos una copia local en engine/.
     engine_dir = HERE / "engine"
     if engine_dir.exists():
         ext = ".exe" if platform.system() == "Windows" else ""
@@ -41,7 +56,7 @@ def find_stockfish():
                     return str(p)
                 elif not ext and not p.name.endswith(".exe"):
                     return str(p)
-        # Last resort on Windows: any .exe
+        # Último recurso en Windows: cualquier .exe con "stockfish" en el nombre.
         if platform.system() == "Windows":
             for p in engine_dir.rglob("*.exe"):
                 if "stockfish" in p.name.lower():
@@ -55,7 +70,11 @@ if STOCKFISH_PATH is None:
 
 print(f"✓ Stockfish: {STOCKFISH_PATH}")
 
-# ─── Difficulty presets ──────────────────────────────────
+# ---------------------------------------------------------------------------
+# Presets de dificultad
+# ---------------------------------------------------------------------------
+# `skill` controla fuerza interna del motor (0-20 en builds compatibles).
+# `depth` y `time` limitan búsqueda para mantener respuesta fluida.
 DIFFICULTIES = {
     "beginner": {"skill": 0,  "depth": 1,  "time": 0.05, "elo": 800},
     "easy":     {"skill": 5,  "depth": 5,  "time": 0.15, "elo": 1200},
@@ -64,14 +83,19 @@ DIFFICULTIES = {
     "master":   {"skill": 20, "depth": 20, "time": 1.0,  "elo": 2600},
 }
 
-# ─── Global engine handle (reused across requests) ──────
+# ---------------------------------------------------------------------------
+# Motor global reutilizable
+# ---------------------------------------------------------------------------
+# Mantener una sola instancia reduce latencia y evita abrir procesos por request.
 engine: chess.engine.SimpleEngine | None = None
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    """Ciclo de vida de FastAPI: arranque y apagado limpio del motor."""
     global engine
     print("Starting Stockfish engine …")
     engine = chess.engine.SimpleEngine.popen_uci(STOCKFISH_PATH)
+    # Ajustes conservadores para equipos normales.
     engine.configure({"Threads": 2, "Hash": 128})
     print("✓ Engine ready")
     yield
@@ -89,7 +113,9 @@ app.add_middleware(
 )
 
 
-# ─── Schemas ─────────────────────────────────────────────
+# ---------------------------------------------------------------------------
+# Esquemas de entrada/salida (validación + documentación automática)
+# ---------------------------------------------------------------------------
 class MoveRequest(BaseModel):
     fen: str
     difficulty: str = "medium"
@@ -110,10 +136,12 @@ class EvalResponse(BaseModel):
     mate: int | None
 
 
-# ─── Routes ──────────────────────────────────────────────
+# ---------------------------------------------------------------------------
+# Endpoints API
+# ---------------------------------------------------------------------------
 @app.post("/api/move", response_model=MoveResponse)
 def get_best_move(req: MoveRequest):
-    """Ask Stockfish for the best move given a FEN position."""
+    """Devuelve la mejor jugada de Stockfish para una posición FEN."""
     global engine
     if engine is None:
         raise HTTPException(503, "Engine not ready")
@@ -128,20 +156,22 @@ def get_best_move(req: MoveRequest):
     if board.is_game_over():
         raise HTTPException(400, "Game is already over")
 
-    # Configure skill level
+    # Algunos binarios soportan Skill Level explícito.
+    # Si no lo soporta, continuamos con límites de profundidad/tiempo.
     try:
         engine.configure({"Skill Level": preset["skill"]})
     except chess.engine.EngineError:
         pass  # some builds don't support it
 
-    # Search with both depth limit and time limit (whichever hits first → fast)
+    # Combinamos límite por profundidad y por tiempo:
+    # termina al alcanzar el primero, dando buena respuesta en UI.
     limit = chess.engine.Limit(
         depth=preset["depth"],
         time=preset["time"],
     )
     result = engine.play(board, limit, info=chess.engine.INFO_SCORE)
 
-    # Parse evaluation
+    # Parseo de evaluación en perspectiva de blancas.
     evaluation = 0.0
     mate = None
     if result.info and "score" in result.info:
@@ -165,7 +195,7 @@ def get_best_move(req: MoveRequest):
 
 @app.post("/api/eval", response_model=EvalResponse)
 def get_evaluation(req: EvalRequest):
-    """Get evaluation of a position without making a move."""
+    """Evalúa una posición sin pedir jugada."""
     global engine
     if engine is None:
         raise HTTPException(503, "Engine not ready")
@@ -191,10 +221,14 @@ def get_evaluation(req: EvalRequest):
 
 @app.get("/api/health")
 def health():
+    """Endpoint liviano para saber si backend+motor están listos."""
     return {"status": "ok", "engine": STOCKFISH_PATH is not None}
 
 
-# ─── Serve static frontend ──────────────────────────────
+# ---------------------------------------------------------------------------
+# Frontend estático
+# ---------------------------------------------------------------------------
+# Montamos todo el directorio raíz para servir HTML/CSS/JS y assets.
 app.mount("/static", StaticFiles(directory=str(HERE)), name="static")
 
 @app.get("/")
@@ -203,14 +237,18 @@ def root():
 
 @app.get("/{filename:path}")
 def static_files(filename: str):
+    """Sirve archivos estáticos del proyecto, excepto el árbol `engine/`."""
     fp = HERE / filename
     if fp.is_file() and not str(fp.resolve()).startswith(str(HERE / "engine")):
         return FileResponse(str(fp))
     raise HTTPException(404)
 
 
-# ─── Main ────────────────────────────────────────────────
+# ---------------------------------------------------------------------------
+# Punto de entrada local
+# ---------------------------------------------------------------------------
 if __name__ == "__main__":
     import uvicorn
-    print("\n🚀  ChessAI server → http://localhost:3000\n")
-    uvicorn.run(app, host="0.0.0.0", port=3000, log_level="info")
+    port = int(os.getenv("PORT", "3000"))
+    print(f"\n🚀  ChessAI server → http://localhost:{port}\n")
+    uvicorn.run(app, host="0.0.0.0", port=port, log_level="info")

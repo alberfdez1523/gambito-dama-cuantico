@@ -20,10 +20,14 @@ const DIFF_META = {
     master:   { icon: '💀', label: 'Maestro',      elo: '~2600' },
 };
 
-// ─── Sound FX ───
+// ---------------------------------------------------------------------------
+// Efectos de sonido generados por WebAudio
+// ---------------------------------------------------------------------------
+// Mantiene todo autocontenido (sin archivos de audio cortos para cada efecto).
 class SoundFX {
     constructor() { this.ctx = null; }
     _getCtx() {
+        // El contexto puede empezar suspendido hasta interacción del usuario.
         if (!this.ctx) { try { this.ctx = new (window.AudioContext || window.webkitAudioContext)(); } catch { return null; } }
         if (this.ctx.state === 'suspended') this.ctx.resume();
         return this.ctx;
@@ -38,7 +42,9 @@ class SoundFX {
     end()     { this._tone(523, 0.12); setTimeout(() => this._tone(659, 0.12), 120); setTimeout(() => this._tone(784, 0.25), 240); }
 }
 
-// ─── Ambient Music (MP3 file) ───
+// ---------------------------------------------------------------------------
+// Música de fondo (archivo mp3)
+// ---------------------------------------------------------------------------
 class AmbientMusic {
     constructor() {
         this.audio = new Audio('music/lofi.mp3');
@@ -63,6 +69,7 @@ class AmbientMusic {
     }
 
     toggle() {
+        // Devuelve el estado final para refrescar texto del botón desde fuera.
         if (this.isPlaying) this.stop(); else this.start();
         return this.isPlaying;
     }
@@ -87,7 +94,7 @@ class StartMenu {
     }
 
     _bind() {
-        // Color picker
+        // Selector de color del jugador.
         document.getElementById('colorPicker').addEventListener('click', (e) => {
             const btn = e.target.closest('.color-opt');
             if (!btn) return;
@@ -96,7 +103,7 @@ class StartMenu {
             this.selectedColor = btn.dataset.color;
         });
 
-        // Difficulty grid
+        // Selector de dificultad de IA.
         document.getElementById('diffGrid').addEventListener('click', (e) => {
             const btn = e.target.closest('.diff-opt');
             if (!btn) return;
@@ -105,10 +112,11 @@ class StartMenu {
             this.selectedDiff = btn.dataset.diff;
         });
 
-        // Play button
+        // Inicio de partida.
         document.getElementById('startPlayBtn').addEventListener('click', () => {
             if (!this.serverReady) return;
             let color = this.selectedColor;
+            // Si el usuario pidió azar, decidimos aquí para que quede fijo en esta partida.
             if (color === 'random') color = Math.random() < 0.5 ? 'w' : 'b';
             this.onPlay(color, this.selectedDiff);
         });
@@ -121,6 +129,7 @@ class StartMenu {
 
         const tryConnect = async () => {
             try {
+                // Timeout corto: evita que la UI se quede bloqueada si backend no responde.
                 const res = await fetch(API_BASE + '/api/health', { signal: AbortSignal.timeout(3000) });
                 if (res.ok) {
                     this.serverReady = true;
@@ -134,7 +143,7 @@ class StartMenu {
         };
 
         btn.disabled = true;
-        // Retry up to 20 times (every 1.5s = ~30s total wait)
+        // Reintento progresivo al cargar: experiencia más amable al iniciar backend primero.
         for (let i = 0; i < 20; i++) {
             if (await tryConnect()) return;
             await new Promise(r => setTimeout(r, 1500));
@@ -161,6 +170,7 @@ class StartMenu {
 
 class ChessApp {
     constructor(playerColor, difficulty) {
+        // Estado base de la partida y UI.
         this.game           = new Chess();
         this.selectedSquare = null;
         this.legalMoves     = [];
@@ -182,7 +192,7 @@ class ChessApp {
         this.render();
         this._bindEvents();
 
-        // If AI plays white, request move immediately
+        // Si usuario juega negras, la IA mueve primero.
         if (this.playerColor === 'b') {
             setTimeout(() => this._requestAIMove(), 300);
         }
@@ -195,6 +205,7 @@ class ChessApp {
     }
 
     _cacheDom() {
+        // Cachear elementos evita querySelector repetitivo durante render.
         const ids = [
             'board', 'moveHistory', 'statusBar', 'thinkingIndicator',
             'chanceWhite', 'chanceDraw', 'chanceBlack',
@@ -209,12 +220,14 @@ class ChessApp {
         ids.forEach(id => this.dom[id] = document.getElementById(id));
     }
 
-    // ── API calls ──
+    // -----------------------------------------------------------------------
+    // Integración con backend
+    // -----------------------------------------------------------------------
     async _requestAIMove() {
         if (this.destroyed) return;
         if (this.game.game_over()) return;
         if (this.game.turn() === this.playerColor) return;
-        if (this.isThinking) return;          // prevent concurrent AI requests
+        if (this.isThinking) return;          // evita solicitudes simultáneas
 
         this.isThinking = true;
         this._updateThinking();
@@ -231,7 +244,7 @@ class ChessApp {
             const data = await res.json();
             if (this.destroyed) return;
 
-            // Parse UCI move
+            // Formato UCI: e2e4, e7e8q, etc.
             const from  = data.bestmove.substring(0, 2);
             const to    = data.bestmove.substring(2, 4);
             const promo = data.bestmove.length > 4 ? data.bestmove[4] : undefined;
@@ -242,7 +255,7 @@ class ChessApp {
                 this._playSound(move);
             }
 
-            // Update eval
+            // Refresca barra de probabilidades con la evaluación actual.
             this._applyEval(data.evaluation, data.mate);
 
         } catch (err) {
@@ -255,6 +268,7 @@ class ChessApp {
     }
 
     _applyEval(cp, mate) {
+        // Convierte score del motor a una probabilidad más legible para usuario.
         let whiteWin, draw, blackWin;
 
         if (mate !== null && mate !== undefined) {
@@ -262,9 +276,9 @@ class ChessApp {
             else           { whiteWin = 0.5; draw = 0.5; blackWin = 99; }
         } else {
             const val = cp || 0;
-            // Lichess-style win probability: sigmoid with k≈0.004
+            // Curva sigmoide estilo Lichess para mapear centipawns a probabilidad.
             const wP = 1 / (1 + Math.exp(-0.004 * val));
-            // Draw probability decreases as advantage grows
+            // A más ventaja, menor probabilidad de tablas.
             const drawBase = Math.max(0, 1 - Math.abs(val) / 800);
             draw = drawBase * 35;  // max ~35% draw at equal position
             const remaining = 100 - draw;
@@ -272,7 +286,7 @@ class ChessApp {
             blackWin = remaining * (1 - wP);
         }
 
-        // Clamp
+        // Evitamos valores extremos / negativos por estabilidad visual.
         whiteWin = Math.max(0.5, Math.min(99, whiteWin));
         blackWin = Math.max(0.5, Math.min(99, blackWin));
         draw = Math.max(0, Math.min(99, draw));
@@ -285,7 +299,7 @@ class ChessApp {
     }
 
     _setChances(w, d, b) {
-        // Ensure they add up to 100
+        // Ajuste final para que siempre sumen 100% tras redondeo.
         const diff = 100 - (w + d + b);
         d += diff;
 
@@ -297,7 +311,9 @@ class ChessApp {
         if (this.dom.chanceLabelBlack) this.dom.chanceLabelBlack.textContent = `\u2b1b ${b}%`;
     }
 
-    // ── Badge ──
+    // -----------------------------------------------------------------------
+    // Datos de cabecera
+    // -----------------------------------------------------------------------
     _updateBadge() {
         const d = DIFF_META[this.difficulty] || DIFF_META.medium;
         if (this.dom.badgeDiff)  this.dom.badgeDiff.textContent  = `${d.icon} ${d.label}`;
@@ -312,9 +328,9 @@ class ChessApp {
         this.dom.bottomElo.textContent  = 'Jugador';
     }
 
-    // ══════════════════════════════════
-    //  RENDERING
-    // ══════════════════════════════════
+    // -----------------------------------------------------------------------
+    // Renderizado
+    // -----------------------------------------------------------------------
 
     render() {
         this._renderBoard();
@@ -329,6 +345,7 @@ class ChessApp {
 
         for (let vr = 0; vr < 8; vr++) {
             for (let vc = 0; vc < 8; vc++) {
+                // vr/vc = coordenadas visuales; br/bc = coordenadas reales de tablero.
                 const br = this.boardFlipped ? 7 - vr : vr;
                 const bc = this.boardFlipped ? 7 - vc : vc;
 
@@ -353,6 +370,7 @@ class ChessApp {
                     const pel = document.createElement('div');
                     pel.className = 'piece ' + (piece.color === 'w' ? 'white-piece' : 'black-piece');
                     pel.textContent = PIECE_UNICODE[key];
+                    // Solo permitimos arrastrar piezas propias cuando es turno del usuario.
                     pel.draggable = (piece.color === this.playerColor && piece.color === this.game.turn() && !this.isThinking && !this.game.game_over());
                     div.appendChild(pel);
                     if (isLegal) div.classList.add('legal-capture');
@@ -380,7 +398,7 @@ class ChessApp {
         }
     }
 
-    // ── Move description helpers ──
+    // Helpers de texto para historial.
     _pieceName(piece) {
         const names = { k: 'Rey', q: 'Dama', r: 'Torre', b: 'Alfil', n: 'Caballo', p: 'Peón' };
         return names[piece] || piece;
@@ -444,6 +462,7 @@ class ChessApp {
         const capturedBy = { w: [], b: [] };
         history.forEach(m => { if (m.captured) capturedBy[m.color].push(m.captured); });
 
+        // Ordenamos por valor para que las capturas sean fáciles de leer (Q,R,B/N,P).
         const renderPieces = (pieces, capturerColor) => {
             const opColor = capturerColor === 'w' ? 'b' : 'w';
             return [...pieces]
@@ -463,9 +482,9 @@ class ChessApp {
         this.dom.bottomAdvantage.textContent = diff > 0 ? `+${diff}` : '';
     }
 
-    // ══════════════════════════════════
-    //  EVENTS
-    // ══════════════════════════════════
+    // -----------------------------------------------------------------------
+    // Eventos de interacción
+    // -----------------------------------------------------------------------
 
     _bindEvents() {
         const board = this.dom.board;
@@ -486,7 +505,7 @@ class ChessApp {
         document.getElementById('modalClose').addEventListener('click', () => this._closeModals(), sig);
         document.getElementById('newGameBtn').addEventListener('click', () => { window.startMenu.show(); }, sig);
 
-        // Music controls
+        // Controles de música de ambiente.
         const musicBtn = document.getElementById('musicToggleBtn');
         const volumeSlider = document.getElementById('musicVolume');
         musicBtn.addEventListener('click', () => {
@@ -503,7 +522,7 @@ class ChessApp {
     }
 
     _onClick(e) {
-        if (this._touchHandled) return;       // skip synthetic click after touch
+        if (this._touchHandled) return;       // ignora click fantasma posterior a touch
         if (this.isThinking || this.game.game_over()) return;
         if (this.game.turn() !== this.playerColor) return;
         const sqEl = e.target.closest('.square');
@@ -520,6 +539,7 @@ class ChessApp {
     }
 
     _onDragStart(e) {
+        // Drag and drop clásico para escritorio.
         if (this.isThinking || this.game.game_over() || this.game.turn() !== this.playerColor) { e.preventDefault(); return; }
         const sqEl = e.target.closest('.square');
         if (!sqEl) { e.preventDefault(); return; }
@@ -543,6 +563,7 @@ class ChessApp {
     }
 
     _onTouchStart(e) {
+        // Guardamos origen del gesto para soportar tap-to-move y drag en móvil.
         if (this.isThinking || this.game.game_over() || this.game.turn() !== this.playerColor) return;
         const touch = e.touches[0];
         const sqEl = document.elementFromPoint(touch.clientX, touch.clientY)?.closest('.square');
@@ -561,7 +582,7 @@ class ChessApp {
         const data = this.dragData;
         this.dragData = null;
 
-        // Suppress the synthetic click the browser fires after touch
+        // Suprime el click sintético que emiten muchos navegadores tras un touch.
         this._touchHandled = true;
         setTimeout(() => { this._touchHandled = false; }, 400);
 
@@ -584,9 +605,9 @@ class ChessApp {
         }
     }
 
-    // ══════════════════════════════════
-    //  SELECTION & MOVES
-    // ══════════════════════════════════
+    // -----------------------------------------------------------------------
+    // Selección y ejecución de jugadas
+    // -----------------------------------------------------------------------
 
     _select(sq) {
         const piece = this.game.get(sq);
@@ -601,6 +622,7 @@ class ChessApp {
     }
 
     _tryPlayerMove(move) {
+        // Si el peón llega a última fila, abrimos modal de promoción.
         if (move.piece === 'p' && (move.to[1] === '8' || move.to[1] === '1')) {
             this._showPromotion(move);
             return;
@@ -609,6 +631,7 @@ class ChessApp {
     }
 
     _executePlayerMove(from, to, promotion) {
+        // `chess.js` valida legalidad final antes de aplicar.
         const result = this.game.move({ from, to, promotion: promotion || undefined });
         if (!result) return;
         this._afterMove(result);
@@ -626,7 +649,7 @@ class ChessApp {
         if (this.game.game_over()) setTimeout(() => this._showGameOver(), 400);
     }
 
-    // ═══ Promotion ═══
+    // Modal de promoción.
     _showPromotion(move) {
         const modal = this.dom.promotionModal;
         const opts  = this.dom.promotionOptions;
@@ -644,7 +667,9 @@ class ChessApp {
         modal.classList.add('active');
     }
 
-    // ═══ UI Updates ═══
+    // -----------------------------------------------------------------------
+    // Estado visual
+    // -----------------------------------------------------------------------
     _updateStatus() {
         const bar  = this.dom.statusBar;
         const dot  = bar.querySelector('.status-dot');
@@ -687,7 +712,7 @@ class ChessApp {
         // legacy — no longer used, kept for safety
     }
 
-    // ═══ Game Actions ═══
+    // Acciones manuales del jugador.
     undo() {
         if (this.isThinking || this.game.history().length < 2) return;
         this.game.undo();
@@ -706,7 +731,7 @@ class ChessApp {
         this._showGameOverModal('🏳️ Te has rendido', 'Stockfish AI gana la partida.', 'lose');
     }
 
-    // ═══ Game Over ═══
+    // Cierre de partida.
     _showGameOver() {
         if (this.game.in_checkmate()) {
             const lost = this.game.turn() === this.playerColor;
@@ -731,7 +756,7 @@ class ChessApp {
         document.querySelectorAll('.overlay').forEach(m => m.classList.remove('active'));
     }
 
-    // ═══ Sound ═══
+    // Sonidos contextuales por tipo de jugada.
     _playSound(move) {
         if (move.captured) this.sounds.capture(); else this.sounds.move();
         if (this.game.in_check()) setTimeout(() => this.sounds.check(), 80);
@@ -746,7 +771,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (typeof Chess === 'undefined') return;
 
     const startMenu = new StartMenu((color, difficulty) => {
-        // Destroy previous game instance to remove its event listeners
+        // Destruimos instancia previa para no dejar listeners vivos.
         if (window.chessApp) {
             window.chessApp.destroy();
             window.chessApp = null;

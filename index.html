@@ -11,6 +11,7 @@
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>♛</text></svg>">
 </head>
 <body>
+    <!-- Contenedor raíz de toda la app SPA (menú + pantalla de juego) -->
     <div id="app">
         <!-- ═══════════════════════════════════════════
              START MENU
@@ -27,7 +28,7 @@
                     <p class="start-sub">Powered by Stockfish 17 — Motor local</p>
                 </div>
 
-                <!-- Color -->
+                <!-- Selector de color: blancas / azar / negras -->
                 <div class="start-section">
                     <label class="start-label">Elige tu color</label>
                     <div class="color-picker" id="colorPicker">
@@ -46,7 +47,7 @@
                     </div>
                 </div>
 
-                <!-- Difficulty -->
+                <!-- Selector de dificultad ligado a presets del backend -->
                 <div class="start-section">
                     <label class="start-label">Nivel de dificultad</label>
                     <div class="diff-grid" id="diffGrid">
@@ -208,7 +209,7 @@
             </div>
         </div>
 
-        <!-- Promotion Modal -->
+        <!-- Modal de promoción (se abre cuando un peón llega al final) -->
         <div class="overlay" id="promotionModal">
             <div class="modal promo-modal">
                 <h3>Promoción de peón</h3>
@@ -217,7 +218,7 @@
             </div>
         </div>
 
-        <!-- Game Over Modal -->
+        <!-- Modal de fin de partida (victoria/derrota/tablas) -->
         <div class="overlay" id="gameOverModal">
             <div class="modal gameover-modal">
                 <div class="go-icon" id="gameOverIcon">♛</div>
@@ -231,7 +232,9 @@
         </div>
     </div>
 
+    <!-- chess.js aporta reglas y validación legal de jugadas -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
+    <!-- app.js contiene toda la lógica de UI + llamadas al backend -->
     <script src="app.js"></script>
 </body>
 </html>

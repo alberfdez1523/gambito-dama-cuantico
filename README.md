@@ -1,61 +1,48 @@
-# ♛ ChessAI — Juega contra Stockfish en tu navegador
+# ChessAI
 
-Aplicación web de ajedrez que te permite jugar contra el motor **Stockfish 17** de forma local. Incluye selección de color, cinco niveles de dificultad, evaluación en tiempo real, historial de movimientos y detección de jaque mate / tablas.
+Aplicacion web para jugar ajedrez contra Stockfish desde el navegador.
 
----
+Incluye:
+- Seleccion de color (blancas, negras o azar)
+- 5 niveles de dificultad
+- Historial descriptivo de movimientos
+- Probabilidades de victoria/tablas/derrota segun evaluacion del motor
+- Soporte de mouse y tactil
+- Musica ambiente y efectos de sonido
 
-## Estructura del proyecto
+## Stack tecnico
 
-```
+- Frontend: `index.html` + `style.css` + `app.js`
+- Reglas de ajedrez en cliente: `chess.js`
+- Backend: `FastAPI` (`server.py`)
+- Motor: `Stockfish` local via `python-chess`
+
+## Estructura
+
+```txt
 CHESS-IA/
-├── server.py          ← Backend FastAPI (sirve el frontend y comunica con Stockfish)
-├── index.html         ← Interfaz principal
-├── app.js             ← Lógica del tablero, turnos e interacción con la API
-├── style.css          ← Estilos
-├── package.json       ← Metadatos del proyecto
-└── engine/
-    └── stockfish/     ← Código fuente / binario de Stockfish
+|- app.js
+|- index.html
+|- style.css
+|- server.py
+|- requirements.txt
+|- render.yaml
+|- package.json
+|- music/
+|  \- lofi.mp3
+\- engine/
+     \- stockfish/
 ```
 
-## Cómo funciona
+## Requisitos
 
-1. **`server.py`** levanta un servidor FastAPI en `http://localhost:3000`.
-2. Sirve los archivos estáticos (HTML, JS, CSS) y expone dos endpoints:
-   - `POST /api/move` — recibe un FEN + dificultad y devuelve el mejor movimiento de Stockfish, junto con la evaluación de la posición.
-   - `POST /api/eval` — devuelve solo la evaluación de una posición dada.
-   - `GET /api/health` — comprueba que el motor esté listo.
-3. **`app.js`** maneja toda la interfaz: dibuja el tablero, valida movimientos con [chess.js](https://github.com/jhlywa/chess.js), y tras cada jugada del usuario envía el FEN al servidor para obtener la respuesta de Stockfish.
+- Python 3.10 o superior
+- Pip actualizado
+- Binario de Stockfish disponible (en `engine/` o instalado en el sistema)
 
-### Niveles de dificultad
+## Instalacion local
 
-| Nivel        | Skill Level | Profundidad | ELO aprox. |
-|--------------|:-----------:|:-----------:|:----------:|
-| Principiante |      0      |      1      |   ~800     |
-| Fácil        |      5      |      5      |  ~1200     |
-| Medio        |     10      |     10      |  ~1600     |
-| Difícil      |     15      |     14      |  ~2000     |
-| Maestro      |     20      |     20      |  ~2600     |
-
----
-
-## Requisitos previos
-
-- **Python 3.10+**
-- **Binario de Stockfish** (`.exe` en Windows) dentro de la carpeta `engine/`
-- Dependencias de Python: `fastapi`, `uvicorn`, `python-chess`
-
----
-
-## Instalación
-
-### 1. Clonar o descargar el proyecto
-
-```bash
-git clone <url-del-repo>
-cd CHESS-IA
-```
-
-### 2. Crear un entorno virtual e instalar dependencias
+1. Crear y activar entorno virtual.
 
 ```bash
 python -m venv .venv
@@ -65,60 +52,129 @@ python -m venv .venv
 
 # Linux / macOS
 source .venv/bin/activate
-
-pip install fastapi uvicorn python-chess
 ```
 
-### 3. Colocar el binario de Stockfish
+2. Instalar dependencias.
 
-Descarga Stockfish desde [stockfishchess.org](https://stockfishchess.org/download/) y coloca el ejecutable en algún lugar dentro de `engine/`. El servidor lo buscará automáticamente. Ejemplo:
-
+```bash
+pip install -r requirements.txt
 ```
+
+3. Asegurar Stockfish.
+
+- Opcion A: tener `stockfish` instalado en el sistema (PATH).
+- Opcion B: colocar el ejecutable dentro de `engine/`.
+
+Ejemplo en Windows:
+
+```txt
 engine/
-└── stockfish/
-    └── stockfish-windows-x86-64-avx2.exe
+\- stockfish/
+     \- stockfish-windows-x86-64-avx2.exe
 ```
 
----
-
-## Arrancar la aplicación
+## Ejecutar en local
 
 ```bash
 python server.py
 ```
 
-Verás en la terminal:
+Luego abrir:
 
-```
-✓ Stockfish: engine\stockfish\stockfish-windows-x86-64-avx2.exe
-Starting Stockfish engine …
-✓ Engine ready
-
-🚀  ChessAI server → http://localhost:3000
+```txt
+http://localhost:3000
 ```
 
-Abre **http://localhost:3000** en tu navegador y empieza a jugar.
+## API
 
----
+- `GET /api/health`
+    Verifica que el backend esta vivo y que Stockfish se detecto.
 
-## Uso
+- `POST /api/move`
+    Pide la mejor jugada para una posicion.
 
-1. Elige tu **color** (Blancas, Negras o Azar).
-2. Selecciona el **nivel de dificultad**.
-3. Pulsa **Jugar**.
-4. Haz tus movimientos haciendo clic o arrastrando las piezas.
-5. Stockfish responderá automáticamente en su turno.
+    Body:
 
-### Acciones disponibles durante la partida
+```json
+{
+    "fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+    "difficulty": "medium"
+}
+```
 
-| Botón        | Acción                                     |
-|--------------|--------------------------------------------|
-| ↩ Deshacer   | Deshace tu último movimiento y el de la IA |
-| 🔄 Girar     | Gira el tablero 180°                       |
-| 🏳️ Rendirse | Termina la partida como derrota            |
-| ⟳ Nueva Partida | Vuelve al menú de inicio                |
+    Respuesta:
 
----
+```json
+{
+    "bestmove": "e2e4",
+    "evaluation": 22,
+    "mate": null,
+    "ponder": "c7c5"
+}
+```
+
+- `POST /api/eval`
+    Evalua posicion sin forzar jugada.
+
+## Dificultades
+
+| Nivel | Skill | Depth | Time (s) | ELO aprox |
+|---|---:|---:|---:|---:|
+| beginner | 0 | 1 | 0.05 | 800 |
+| easy | 5 | 5 | 0.15 | 1200 |
+| medium | 10 | 10 | 0.3 | 1600 |
+| hard | 15 | 14 | 0.6 | 2000 |
+| master | 20 | 20 | 1.0 | 2600 |
+
+## Publicar gratis para compartirla con cualquiera
+
+La forma mas simple para que cualquier persona entre por URL es desplegar en Render.
+
+### Opcion recomendada: Render (gratis)
+
+1. Subir el proyecto a GitHub.
+2. Crear cuenta en Render: `https://render.com`.
+3. En Render, crear un nuevo servicio desde el repositorio.
+4. Detectara `render.yaml` automaticamente.
+5. Esperar build y deploy.
+6. Compartir la URL publica de Render (ejemplo: `https://chess-ia.onrender.com`).
+
+Notas importantes:
+- Plan gratis puede "dormir" la app tras inactividad; el primer acceso tarda unos segundos.
+- `server.py` ya soporta puerto dinamico con variable `PORT` (requerido en cloud).
+- Si Render no encontrara Stockfish por paquete del sistema, puedes subir un binario Linux en `engine/`.
+
+### Configuracion manual en Render (si no usa `render.yaml`)
+
+- Environment: `Python`
+- Build Command:
+
+```bash
+pip install -r requirements.txt ; apt-get update ; apt-get install -y stockfish
+```
+
+- Start Command:
+
+```bash
+python server.py
+```
+
+## Calidad y mantenimiento
+
+- El codigo de frontend y backend esta comentado por secciones para que sea facil de mantener.
+- El backend reutiliza una sola instancia de Stockfish para mejor rendimiento.
+- Se protege el acceso a `engine/` desde el router estatico.
+
+## Solucion de problemas
+
+- Error `Stockfish binary not found`:
+    Instala Stockfish en sistema o coloca ejecutable en `engine/`.
+
+- El boton `Jugar` queda deshabilitado:
+    Revisa que `python server.py` este en ejecucion y que `GET /api/health` responda `ok`.
+
+- En movil no arrastra piezas:
+    La app soporta touch; prueba tap en origen y destino si el gesto no se reconoce.
 
 ## Licencia
 

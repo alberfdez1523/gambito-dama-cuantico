@@ -2,7 +2,7 @@
    ChessAI — Modern Dark Theme  (v2 — Start Menu)
    ═══════════════════════════════════════════════════════ */
 
-/* ───── Variables ───── */
+/* ───── Variables de tema y layout global ───── */
 :root {
     --bg-body: #0c0c18;
     --bg-primary: #111127;
@@ -70,7 +70,7 @@ body {
     padding: 1.5rem;
 }
 
-/* floating background pieces */
+/* Piezas decorativas del fondo (solo visual) */
 .start-bg-pieces {
     position: absolute;
     inset: 0;
@@ -530,7 +530,7 @@ body {
 .move-icon { font-size: 0.65rem; line-height: 1; }
 .move-desc { color: var(--text); cursor: default; font-family: 'Inter', sans-serif; }
 
-/* ── Chances Bar ── */
+/* ── Barra de probabilidades (blancas / tablas / negras) ── */
 .chances-wrap { display: flex; flex-direction: column; gap: 0.5rem; }
 
 .chances-bar {
@@ -538,6 +538,7 @@ body {
     overflow: hidden; border: 1px solid rgba(255,255,255,0.08);
 }
 .chances-fill {
+    /* Transición suave para que los cambios de evaluación no sean bruscos */
     transition: width 0.6s ease;
     display: flex; align-items: center; justify-content: center;
     font-size: 0; /* hide text inside bar */
@@ -612,7 +613,7 @@ body {
 .status-dot.thinking  { background: var(--warning); animation: pulse 0.8s infinite; }
 .status-dot.ended     { background: var(--text-muted); }
 
-/* ═══════ THINKING DOTS ═══════ */
+/* ═══════ THINKING DOTS (animación del avatar IA) ═══════ */
 .thinking-dots {
     position: absolute; bottom: -4px; left: 50%; transform: translateX(-50%);
     display: none; gap: 2px;
@@ -693,7 +694,7 @@ body {
 .move-list::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 2px; }
 .move-list::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.2); }
 
-/* ═══════ RESPONSIVE ═══════ */
+/* ═══════ RESPONSIVE: desktop, tablet y móvil ═══════ */
 @media (min-width: 1100px) {
     :root { --board-size: min(620px, calc(100vh - 220px)); }
 }
