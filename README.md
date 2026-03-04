@@ -170,6 +170,10 @@ python server.py
 - Error `Stockfish binary not found`:
     Instala Stockfish en sistema o coloca ejecutable en `engine/`.
 
+- Error `PermissionError: [Errno 13] Permission denied` al iniciar motor:
+    Suele ocurrir cuando se detecta un archivo llamado "stockfish" que no es ejecutable.
+    Verifica que exista binario real en `engine/stockfish/src/stockfish` (Linux) o `.exe` (Windows).
+
 - El boton `Jugar` queda deshabilitado:
     Revisa que `python server.py` este en ejecucion y que `GET /api/health` responda `ok`.
 

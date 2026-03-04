@@ -36,10 +36,15 @@ def find_stockfish():
     """
     import shutil, platform
 
+    def is_executable_file(path: pathlib.Path) -> bool:
+        """True si existe, es archivo regular y tiene permiso de ejecución."""
+        return path.is_file() and os.access(path, os.X_OK)
+
     # Rutas típicas en Linux (incluyendo muchos contenedores Docker).
     for system_path in ["/usr/games/stockfish", "/usr/bin/stockfish", "/usr/local/bin/stockfish"]:
-        if os.path.isfile(system_path) and os.access(system_path, os.X_OK):
-            return system_path
+        sp = pathlib.Path(system_path)
+        if is_executable_file(sp):
+            return str(sp)
 
     # Si está en el PATH, usamos esa versión.
     sf = shutil.which("stockfish")
@@ -49,17 +54,25 @@ def find_stockfish():
     # Si no está en PATH, buscamos una copia local en engine/.
     engine_dir = HERE / "engine"
     if engine_dir.exists():
-        ext = ".exe" if platform.system() == "Windows" else ""
-        for p in engine_dir.rglob("*"):
-            if "stockfish" in p.name.lower() and p.is_file():
-                if ext and p.name.endswith(ext):
-                    return str(p)
-                elif not ext and not p.name.endswith(".exe"):
-                    return str(p)
-        # Último recurso en Windows: cualquier .exe con "stockfish" en el nombre.
-        if platform.system() == "Windows":
+        is_windows = platform.system() == "Windows"
+
+        # 1) Ruta esperada cuando se compila desde source en Linux (Render).
+        preferred_candidates = [
+            engine_dir / "stockfish" / "src" / ("stockfish.exe" if is_windows else "stockfish"),
+            engine_dir / ("stockfish.exe" if is_windows else "stockfish"),
+        ]
+        for candidate in preferred_candidates:
+            if is_executable_file(candidate):
+                return str(candidate)
+
+        # 2) Búsqueda general: solo archivos ejecutables y con nombre razonable.
+        if is_windows:
             for p in engine_dir.rglob("*.exe"):
-                if "stockfish" in p.name.lower():
+                if "stockfish" in p.name.lower() and is_executable_file(p):
+                    return str(p)
+        else:
+            for p in engine_dir.rglob("*"):
+                if "stockfish" in p.name.lower() and is_executable_file(p):
                     return str(p)
     return None
 
