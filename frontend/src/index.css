@@ -1,0 +1,161 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ─── Variables globales ─── */
+:root {
+  --sq-light: #F0D9B5;
+  --sq-dark: #B58863;
+  --sq-selected: rgba(249, 115, 22, 0.45);
+  --sq-last-from: rgba(249, 115, 22, 0.22);
+  --sq-last-to: rgba(249, 115, 22, 0.35);
+  --sq-legal: rgba(249, 115, 22, 0.55);
+  --sq-check: rgba(239, 68, 68, 0.6);
+  --board-size: min(88vw, 560px);
+  --sq-size: calc(var(--board-size) / 8);
+}
+
+@media (max-width: 640px) {
+  :root {
+    --board-size: calc(100vw - 24px);
+  }
+}
+
+/* ─── Base ─── */
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  overflow-x: hidden;
+}
+
+/* ─── Scrollbar personalizada ─── */
+::-webkit-scrollbar {
+  width: 5px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #333;
+  border-radius: 10px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}
+
+/* ─── Casillas del tablero ─── */
+.sq-light {
+  background-color: var(--sq-light);
+}
+.sq-dark {
+  background-color: var(--sq-dark);
+}
+
+/* Resaltes */
+.sq-selected {
+  box-shadow: inset 0 0 0 3px rgba(249, 115, 22, 0.8);
+  background-color: var(--sq-selected) !important;
+}
+.sq-last-from {
+  background-color: var(--sq-last-from) !important;
+}
+.sq-last-to {
+  background-color: var(--sq-last-to) !important;
+}
+.sq-check {
+  background: radial-gradient(circle, var(--sq-check) 0%, transparent 70%) !important;
+}
+
+/* ─── Piezas ─── */
+.chess-piece {
+  font-family: 'Noto Sans Symbols 2', 'Segoe UI Symbol', 'Apple Color Emoji', sans-serif;
+  font-size: calc(var(--sq-size) * 0.82);
+  line-height: 1;
+  user-select: none;
+  cursor: grab;
+  filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.35));
+  transition: transform 0.08s ease;
+}
+.chess-piece:active {
+  cursor: grabbing;
+}
+.piece-white {
+  color: #ffffff;
+  -webkit-text-stroke: 1px #1a1a1a;
+}
+.piece-black {
+  color: #1a1a1a;
+  -webkit-text-stroke: 0.5px #000;
+}
+
+/* ─── Indicador de movimiento legal ─── */
+.legal-dot {
+  width: 28%;
+  height: 28%;
+  background: var(--sq-legal);
+  border-radius: 50%;
+}
+.legal-ring {
+  width: 85%;
+  height: 85%;
+  border: 3.5px solid var(--sq-legal);
+  border-radius: 50%;
+}
+
+/* ─── Coordenadas ─── */
+.board-coord {
+  font-size: 10px;
+  font-weight: 600;
+  pointer-events: none;
+  user-select: none;
+  opacity: 0.7;
+}
+.coord-file {
+  position: absolute;
+  bottom: 2px;
+  right: 3px;
+}
+.coord-rank {
+  position: absolute;
+  top: 2px;
+  left: 3px;
+}
+
+/* ─── Animaciones Framer Motion helpers ─── */
+.will-change-transform {
+  will-change: transform;
+}
+
+/* ─── Gradiente de fondo para StartMenu ─── */
+.bg-radial-orange {
+  background: radial-gradient(ellipse at 50% 30%, rgba(249, 115, 22, 0.08) 0%, transparent 70%);
+}
+
+/* ─── Shine en botón de Play ─── */
+.btn-shine {
+  position: relative;
+  overflow: hidden;
+}
+.btn-shine::after {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: linear-gradient(
+    to right,
+    transparent 0%,
+    rgba(255, 255, 255, 0.08) 45%,
+    rgba(255, 255, 255, 0.15) 50%,
+    rgba(255, 255, 255, 0.08) 55%,
+    transparent 100%
+  );
+  transform: rotate(25deg) translateX(-120%);
+  transition: transform 0.6s ease;
+}
+.btn-shine:hover::after {
+  transform: rotate(25deg) translateX(120%);
+}

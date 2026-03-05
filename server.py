@@ -241,16 +241,40 @@ def health():
 # ---------------------------------------------------------------------------
 # Frontend estático
 # ---------------------------------------------------------------------------
-# Montamos todo el directorio raíz para servir HTML/CSS/JS y assets.
-app.mount("/static", StaticFiles(directory=str(HERE)), name="static")
+DIST_DIR = HERE / "frontend" / "dist"
+USE_REACT = DIST_DIR.exists() and (DIST_DIR / "index.html").exists()
+
+if USE_REACT:
+    print(f"✓ Serving React build from {DIST_DIR}")
+else:
+    print("ℹ React build not found, serving legacy frontend from project root")
+
+# Música siempre se sirve desde music/
+_music_dir = HERE / "music"
+if _music_dir.exists():
+    app.mount("/music", StaticFiles(directory=str(_music_dir)), name="music")
+
+# Assets del build de Vite (JS/CSS hasheados)
+if USE_REACT and (DIST_DIR / "assets").exists():
+    app.mount("/assets", StaticFiles(directory=str(DIST_DIR / "assets")), name="assets")
+
 
 @app.get("/")
 def root():
+    if USE_REACT:
+        return FileResponse(str(DIST_DIR / "index.html"))
     return FileResponse(str(HERE / "index.html"))
+
 
 @app.get("/{filename:path}")
 def static_files(filename: str):
-    """Sirve archivos estáticos del proyecto, excepto el árbol `engine/`."""
+    """Sirve frontend estático con fallback SPA para React."""
+    if USE_REACT:
+        fp = DIST_DIR / filename
+        if fp.is_file():
+            return FileResponse(str(fp))
+        return FileResponse(str(DIST_DIR / "index.html"))
+
     fp = HERE / filename
     if fp.is_file() and not str(fp.resolve()).startswith(str(HERE / "engine")):
         return FileResponse(str(fp))

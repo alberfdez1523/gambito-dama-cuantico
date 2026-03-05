@@ -1,8 +1,17 @@
 /* ═══════════════════════════════════════════════════════
-   ChessAI — v2: Local Stockfish via Python API
+   ChessAI — v3: Frontend rediseñado con GSAP
    ═══════════════════════════════════════════════════════ */
 
-const API_BASE = '';  // same origin — served by FastAPI
+const API_BASE = '';  // mismo origen — servido por FastAPI
+
+// ─── Wrapper seguro de GSAP para evitar errores si el CDN falla ───
+const gsapSafe = {
+    to:       (...args) => { try { return gsap.to(...args);       } catch(e) {} },
+    from:     (...args) => { try { return gsap.from(...args);     } catch(e) {} },
+    fromTo:   (...args) => { try { return gsap.fromTo(...args);   } catch(e) {} },
+    timeline: (...args) => { try { return gsap.timeline(...args); } catch(e) {} },
+    set:      (...args) => { try { return gsap.set(...args);      } catch(e) {} },
+};
 
 // ─── Piece Unicode Map (estilo clásico relleno, estable en móvil/desktop) ───
 // Usamos la serie negra para todas y dejamos el color al CSS, como el diseño original.
@@ -15,11 +24,11 @@ const PIECE_UNICODE = {
 const PIECE_VALUES = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
 
 const DIFF_META = {
-    beginner: { icon: '🟢', label: 'Principiante', elo: '~800' },
-    easy:     { icon: '🟡', label: 'Fácil',        elo: '~1200' },
-    medium:   { icon: '🟠', label: 'Medio',        elo: '~1600' },
-    hard:     { icon: '🔴', label: 'Difícil',      elo: '~2000' },
-    master:   { icon: '💀', label: 'Maestro',      elo: '~2600' },
+    beginner: { icon: '●', label: 'Principiante', elo: '~800' },
+    easy:     { icon: '●', label: 'Fácil',        elo: '~1200' },
+    medium:   { icon: '●', label: 'Medio',        elo: '~1600' },
+    hard:     { icon: '●', label: 'Difícil',      elo: '~2000' },
+    master:   { icon: '●', label: 'Maestro',      elo: '~2600' },
 };
 
 // ---------------------------------------------------------------------------
@@ -93,6 +102,28 @@ class StartMenu {
 
         this._bind();
         this._checkServer();
+        // Animacion GSAP de entrada de la tarjeta del menu
+        this._animateCardIn();
+    }
+
+    _animateCardIn() {
+        // Anima la tarjeta del menu con un suave efecto de escalado y opacidad
+        gsapSafe.to('.start-card', {
+            opacity:  1,
+            y:        0,
+            duration: 0.7,
+            ease:     'power3.out',
+            delay:    0.1,
+        });
+        // Anima las piezas decorativas del fondo con un fade-in escalonado
+        gsapSafe.from('.hero-piece', {
+            opacity:  0,
+            scale:    0.5,
+            duration: 1.2,
+            ease:     'power2.out',
+            stagger:  0.12,
+            delay:    0.3,
+        });
     }
 
     _bind() {
@@ -156,13 +187,36 @@ class StartMenu {
     }
 
     show() {
-        document.getElementById('startMenu').classList.remove('hidden');
         document.getElementById('gameScreen').classList.add('hidden');
+        document.getElementById('startMenu').classList.remove('hidden');
+        // Re-anima la entrada del menu al volver desde el juego
+        this._animateCardIn();
     }
 
     hide() {
-        document.getElementById('startMenu').classList.add('hidden');
-        document.getElementById('gameScreen').classList.remove('hidden');
+        const menu   = document.getElementById('startMenu');
+        const screen = document.getElementById('gameScreen');
+
+        // Transicion fluida: fade-out menu -> fade-in game screen
+        gsapSafe.to('.start-card', {
+            opacity:  0,
+            y:        -16,
+            scale:    0.97,
+            duration: 0.3,
+            ease:     'power2.in',
+            onComplete: () => {
+                menu.classList.add('hidden');
+                screen.classList.remove('hidden');
+                // Resetear posicion de la card para la siguiente vez que se muestre
+                gsapSafe.set('.start-card', { opacity: 0, y: 24, scale: 1 });
+                // Animar la entrada de la pantalla de juego
+                gsapSafe.from('.header', { opacity: 0, y: -20, duration: 0.4, ease: 'power2.out' });
+                gsapSafe.from('.board-frame', { opacity: 0, scale: 0.95, duration: 0.5, ease: 'power3.out', delay: 0.1 });
+                gsapSafe.from('.player-bar', { opacity: 0, x: -12, duration: 0.4, ease: 'power2.out', stagger: 0.1, delay: 0.15 });
+                gsapSafe.from('.side-panel', { opacity: 0, x: 20, duration: 0.45, ease: 'power2.out', delay: 0.2 });
+                gsapSafe.from('.status-bar', { opacity: 0, y: 10, duration: 0.35, ease: 'power2.out', delay: 0.3 });
+            }
+        });
     }
 }
 
@@ -193,6 +247,8 @@ class ChessApp {
         this._updatePlayerBars();
         this.render();
         this._bindEvents();
+        // Establecer el estado visual del turno activo al inicio
+        this._updateActiveTurn();
 
         // Si usuario juega negras, la IA mueve primero.
         if (this.playerColor === 'b') {
@@ -457,6 +513,13 @@ class ChessApp {
         }
         el.innerHTML = html;
         el.scrollTop = el.scrollHeight;
+        // Animar la ultima entrada del historial con un slide suave
+        const latestRow = el.querySelector('.move-row.latest');
+        if (latestRow) {
+            gsapSafe.from(latestRow, {
+                opacity: 0, x: -8, duration: 0.25, ease: 'power2.out'
+            });
+        }
     }
 
     _renderCaptures() {
@@ -512,7 +575,7 @@ class ChessApp {
         const volumeSlider = document.getElementById('musicVolume');
         musicBtn.addEventListener('click', () => {
             const playing = ambientMusic.toggle();
-            musicBtn.textContent = playing ? '⏸ Pausar' : '▶ Reproducir';
+            musicBtn.textContent = playing ? '\u23F8 Pausar' : '\u25B6 Reproducir';
         }, sig);
         volumeSlider.addEventListener('input', (e) => {
             ambientMusic.setVolume(parseInt(e.target.value) / 100);
@@ -648,7 +711,44 @@ class ChessApp {
         this.legalMoves = [];
         this.lastMove = { from: move.from, to: move.to };
         this.render();
+        // Animar la pieza que acaba de moverse con un efecto de "aterrizaje"
+        this._animatePieceLand(move.to);
+        // Actualizar resaltado de turno activo en las barras de jugador
+        this._updateActiveTurn();
         if (this.game.game_over()) setTimeout(() => this._showGameOver(), 400);
+    }
+
+    /**
+     * Aplica la animacion de aterrizaje a la pieza en la casilla destino.
+     * Usa la clase CSS .piece-land definida en style.css.
+     */
+    _animatePieceLand(sq) {
+        const squareEl = this.dom.board.querySelector(`[data-sq="${sq}"]`);
+        if (!squareEl) return;
+        const pieceEl = squareEl.querySelector('.piece');
+        if (!pieceEl) return;
+        // Animar con GSAP para mejor control y rendimiento
+        gsapSafe.fromTo(pieceEl,
+            { scale: 1.3, y: -8, filter: 'drop-shadow(0 8px 16px rgba(0,0,0,0.5)) brightness(1.3)' },
+            { scale: 1,   y:  0, filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.4)) brightness(1)',
+              duration: 0.35, ease: 'back.out(3)' }
+        );
+    }
+
+    /**
+     * Actualiza la clase active-turn en las barras de jugador
+     * para reflejar visualmente de quien es el turno.
+     */
+    _updateActiveTurn() {
+        const topBar    = document.getElementById('topBar');
+        const bottomBar = document.getElementById('bottomBar');
+        if (!topBar || !bottomBar) return;
+
+        const aiColor   = this.playerColor === 'w' ? 'b' : 'w';
+        const isMyTurn  = this.game.turn() === this.playerColor;
+
+        topBar.classList.toggle('active-turn',    !isMyTurn && !this.game.game_over());
+        bottomBar.classList.toggle('active-turn',  isMyTurn && !this.game.game_over());
     }
 
     // Modal de promoción.
@@ -708,6 +808,7 @@ class ChessApp {
         const el = this.dom.thinkingIndicator;
         if (el) el.classList.toggle('active', this.isThinking);
         this._updateStatus();
+        this._updateActiveTurn();
     }
 
     _setEvalBar(pct, label) {
@@ -750,8 +851,14 @@ class ChessApp {
     _showGameOverModal(title, msg, result) {
         this.dom.gameOverTitle.textContent   = title;
         this.dom.gameOverMessage.textContent = msg;
-        this.dom.gameOverIcon.textContent    = result === 'win' ? '🏆' : result === 'lose' ? '💀' : '🤝';
+        this.dom.gameOverIcon.textContent    = result === 'win' ? '\u{1F3C6}' : result === 'lose' ? '\u{1F480}' : '\u{1F91D}';
         this.dom.gameOverModal.classList.add('active');
+        // Animar el icono del modal con un efecto dramatico
+        gsapSafe.fromTo(this.dom.gameOverIcon,
+            { scale: 0.3, opacity: 0, rotation: -10 },
+            { scale: 1,   opacity: 1, rotation: 0,
+              duration: 0.6, ease: 'back.out(4)', delay: 0.15 }
+        );
     }
 
     _closeModals() {
