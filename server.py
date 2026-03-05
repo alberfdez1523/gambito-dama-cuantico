@@ -541,6 +541,12 @@ def root():
     return FileResponse(str(HERE / "index.html"))
 
 
+@app.head("/")
+def root_head():
+    # Evita 405 en health checks que usan HEAD /
+    return {"status": "ok"}
+
+
 @app.get("/{filename:path}")
 def static_files(filename: str):
     """Sirve frontend estático con fallback SPA para React."""
@@ -548,6 +554,13 @@ def static_files(filename: str):
         fp = DIST_DIR / filename
         if fp.is_file():
             return FileResponse(str(fp))
+
+        # Si parece un asset (tiene extensión), no devolver index.html.
+        # Evita que CSS/JS faltantes rompan silenciosamente la UI.
+        name = pathlib.Path(filename).name
+        if "." in name:
+            raise HTTPException(404)
+
         return FileResponse(str(DIST_DIR / "index.html"))
 
     fp = HERE / filename

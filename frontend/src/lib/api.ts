@@ -45,7 +45,9 @@ export async function requestQuantumAIMove(
 export async function checkHealth(): Promise<boolean> {
   try {
     const res = await fetch(`${API_BASE}/health`, { signal: AbortSignal.timeout(5000) })
-    return res.ok
+    if (!res.ok) return false
+    const data = await res.json() as { engine?: boolean }
+    return !!data.engine
   } catch {
     return false
   }
