@@ -114,7 +114,7 @@ export function useQuantumChess(config: GameConfig, sounds: GameSounds, language
 
   const legalTargets: Set<string> = useMemo(() => {
     if (!selectedPiece) return new Set()
-    if (moveMode === 'merge') return new Set(engine.getMergeTargets(selectedPiece.id))
+    if (moveMode === 'merge') return new Set(engine.getMergeTargets(selectedPiece.id, selectedPiece.square))
     if (firstQuantumTarget) {
       const moves = engine.getLegalMoves(selectedPiece.id, selectedPiece.square)
       return new Set(moves.filter(m => !m.isCapture && m.square !== firstQuantumTarget).map(m => m.square))
@@ -129,7 +129,7 @@ export function useQuantumChess(config: GameConfig, sounds: GameSounds, language
 
   const mergeTargets: Set<string> = useMemo(() => {
     if (!selectedPiece) return new Set()
-    return new Set(engine.getMergeTargets(selectedPiece.id))
+    return new Set(engine.getMergeTargets(selectedPiece.id, selectedPiece.square))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedPiece, boardVersion])
 
@@ -158,7 +158,7 @@ export function useQuantumChess(config: GameConfig, sounds: GameSounds, language
 
     const modes: QMoveMode[] = ['classical']
     if (piece.type !== 'p') modes.push('quantum')
-    if (Object.keys(piece.positions).length > 1 && engine.getMergeTargets(piece.id).length > 0) {
+    if (Object.keys(piece.positions).length > 1 && engine.getMergeTargets(piece.id, selectedPiece.square).length > 0) {
       modes.push('merge')
     }
     return modes
@@ -206,7 +206,7 @@ export function useQuantumChess(config: GameConfig, sounds: GameSounds, language
     if (selectedPiece) {
       if (legalTargets.has(sq)) {
         if (moveMode === 'merge') {
-          engine.doMerge(selectedPiece.id, sq)
+          engine.doMergeFrom(selectedPiece.id, selectedPiece.square, sq)
           sounds.playMove()
           setSelectedPiece(null)
           setMoveMode('classical')

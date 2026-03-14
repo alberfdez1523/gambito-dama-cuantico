@@ -83,7 +83,7 @@ if STOCKFISH_PATH is None:
     print("       Compile it first:  cd engine/stockfish/src && make -j2 build ARCH=x86-64")
     sys.exit(1)
 else:
-    print(f"✓ Stockfish: {STOCKFISH_PATH}")
+    print(f"Stockfish found: {STOCKFISH_PATH}")
 
 # ---------------------------------------------------------------------------
 # Presets de dificultad
@@ -139,14 +139,14 @@ def _with_engine_lock(callback):
 async def lifespan(app: FastAPI):
     """Ciclo de vida de FastAPI: arranque y apagado limpio del motor."""
     global engine
-    print("Starting Stockfish engine …")
+    print("Starting Stockfish engine...")
     with engine_lock:
         engine = chess.engine.SimpleEngine.popen_uci(STOCKFISH_PATH)
         # Ajustes conservadores para equipos normales.
         engine.configure({"Threads": 2, "Hash": 128})
-    print("✓ Engine ready")
+    print("Engine ready")
     yield
-    print("Shutting down engine …")
+    print("Shutting down engine...")
     with engine_lock:
         if engine is not None:
             engine.quit()
@@ -535,9 +535,9 @@ DIST_DIR = HERE / "frontend" / "dist"
 USE_REACT = DIST_DIR.exists() and (DIST_DIR / "index.html").exists()
 
 if USE_REACT:
-    print(f"✓ Serving React build from {DIST_DIR}")
+    print(f"Serving React build from {DIST_DIR}")
 else:
-        print("ℹ React build not found. Run 'cd frontend && npm run build' or use 'npm run dev' inside frontend/")
+        print("React build not found. Run 'cd frontend && npm run build' or use 'npm run dev' inside frontend/")
 
 
 def frontend_not_built_response() -> HTMLResponse:
@@ -636,6 +636,6 @@ def static_files(filename: str):
 # ---------------------------------------------------------------------------
 if __name__ == "__main__":
     import uvicorn
-    port = int(os.getenv("PORT", "3000"))
-    print(f"\n🚀  Gambito de Dama Cuantico server -> http://localhost:{port}\n")
+    port = int(os.getenv("PORT", "8000"))
+    print(f"\nGambito de Dama Cuantico server -> http://localhost:{port}\n")
     uvicorn.run(app, host="0.0.0.0", port=port, log_level="info")

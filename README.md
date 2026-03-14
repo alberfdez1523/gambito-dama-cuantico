@@ -124,7 +124,7 @@ npm install
 npm run build
 ```
 
-La app se sirve en `http://localhost:3000` desde FastAPI usando `frontend/dist`.
+La app se sirve en `http://localhost:8000` desde FastAPI usando `frontend/dist`.
 
 Nota: el frontend legado de la raíz fue eliminado. Si `frontend/dist` no existe, compílalo antes de arrancar el backend o usa `npm run dev` dentro de `frontend/`.
 
@@ -139,54 +139,6 @@ Nota: el frontend legado de la raíz fue eliminado. Si `frontend/dist` no existe
 
 - Nombre publico: `Gambito de Dama Cuantico`
 - Servicio Render sugerido: `gambito-dama-cuantico`
-
-## Renombrar en GitHub y Render (gratis)
-
-### 1) Renombrar repositorio en GitHub
-
-1. Entra al repo en GitHub.
-2. Ve a `Settings`.
-3. En `Repository name`, cambia a `gambito-dama-cuantico`.
-4. Guarda con `Rename`.
-5. En local, actualiza el remoto:
-
-```bash
-git remote -v
-git remote set-url origin https://github.com/TU_USUARIO/gambito-dama-cuantico.git
-git remote -v
-```
-
-### 2) Confirmar branding en codigo
-
-1. `frontend/index.html` -> titulo `Gambito de Dama Cuantico`.
-2. `frontend/src/components/StartMenu.tsx` -> encabezado principal actualizado.
-3. `server.py` -> titulo FastAPI actualizado.
-4. `render.yaml` -> nombre del servicio `gambito-dama-cuantico`.
-
-### 3) Actualizar Render (plan Free)
-
-Opcion A (sin crear servicio nuevo):
-
-1. Abre tu servicio en Render.
-2. Ve a `Settings` -> `Name`.
-3. Cambia el nombre (si esta disponible) y guarda.
-4. En `Build & Deploy`, verifica que el repo conectado sea el renombrado.
-5. Dispara `Manual Deploy` o haz `git push` a `main`.
-
-Opcion B (si Render no deja renombrar):
-
-1. Crea un servicio nuevo `Web Service` en Free.
-2. Conecta el repo renombrado.
-3. Usa la configuracion del `render.yaml` del proyecto.
-4. Deploy y valida `health`.
-5. Elimina o suspende el servicio anterior para quedarte en gratis.
-
-### 4) No pagar en Render
-
-1. Usa `plan: free` (ya esta en `render.yaml`).
-2. Mantente con un solo servicio activo si no necesitas multiples.
-3. Evita disco persistente de pago.
-4. Si quieres dominio custom, usa subdominio gratis de Render.
 
 ## Notas de uso
 

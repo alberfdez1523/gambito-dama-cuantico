@@ -106,37 +106,35 @@ export class QuantumChessEngine {
   }
 
   /** Casillas de fusión: reachable desde TODAS las posiciones del quantum piece */
-  getMergeTargets(pieceId: string): string[] {
+  getMergeTargets(pieceId: string, fromSquare?: string): string[] {
     const piece = this.state.pieces[pieceId]
     if (!piece || !piece.alive) return []
     const squares = Object.keys(piece.positions)
     if (squares.length < 2) return []
 
+    const origin = fromSquare && piece.positions[fromSquare] !== undefined ? fromSquare : squares[0]
     const board = this.getBoard()
-    let intersection: Set<string> | null = null
+    const originTargets = new Set(
+      this.getLegalMoves(pieceId, origin)
+        .filter(m => !m.isCapture)
+        .map(m => m.square)
+    )
+    if (originTargets.size === 0) return []
 
+    const result = new Set<string>()
     for (const sq of squares) {
+      if (sq === origin) continue
       const moves = this.getLegalMoves(pieceId, sq)
-      const nonCapture = new Set(moves.filter(m => !m.isCapture).map(m => m.square))
-
-      if (intersection === null) {
-        intersection = nonCapture
-      } else {
-        const filtered: string[] = []
-        intersection.forEach(s => { if (nonCapture.has(s)) filtered.push(s) })
-        intersection = new Set(filtered)
+      for (const move of moves) {
+        if (move.isCapture || !originTargets.has(move.square)) continue
+        const cells = board[move.square] || []
+        const hasOtherPiece = cells.some(c => c.pieceId !== pieceId)
+        if (!hasOtherPiece) result.add(move.square)
       }
     }
 
     // También filtramos: el destino debe estar vacío de piezas enemigas y de otras piezas propias
-    const result: string[] = []
-    for (const sq of intersection ?? []) {
-      const cells = board[sq] || []
-      const hasOtherPiece = cells.some(c => c.pieceId !== pieceId)
-      if (!hasOtherPiece) result.push(sq)
-    }
-
-    return result
+    return [...result]
   }
 
   /** Opciones de enroque cuántico disponibles */
@@ -182,6 +180,10 @@ export class QuantumChessEngine {
 
   doClassicalMove(pieceId: string, from: string, to: string, promotion?: PieceType): QMoveRecord {
     const piece = this.state.pieces[pieceId]
+    const legalMoves = this.getLegalMoves(pieceId, from)
+    const moveInfo = legalMoves.find(m => m.square === to)
+    if (!moveInfo) throw new Error('Movimiento ilegal')
+
     const board = this.getBoard()
     const castleSide = to === 'g1' || to === 'g8' ? 'k' : to === 'c1' || to === 'c8' ? 'q' : null
     const castleInfo = piece.type === 'k' && castleSide
@@ -316,8 +318,6 @@ export class QuantumChessEngine {
     if (sqs.length === 1) piece.positions[sqs[0]] = 1
 
     // Crear entrelazamientos de túnel
-    const moves = this._cachedMoves ?? this.getLegalMoves(pieceId, from)
-    const moveInfo = moves.find(m => m.square === to)
     if (!staysOnOrigin && moveInfo && moveInfo.tunnelThrough.length > 0) {
       for (const tunnelSq of moveInfo.tunnelThrough) {
         const blockerCells = board[tunnelSq]?.filter(c => c.probability < 1) ?? []
@@ -402,8 +402,30 @@ export class QuantumChessEngine {
 
   doMerge(pieceId: string, to: string): QMoveRecord {
     const piece = this.state.pieces[pieceId]
-    // Quitar de todas las posiciones actuales
-    piece.positions = { [to]: 1 }
+    const from = Object.keys(piece?.positions ?? {})[0]
+    if (!from) throw new Error('No hay estados para fusionar')
+    return this.doMergeFrom(pieceId, from, to)
+  }
+
+  doMergeFrom(pieceId: string, from: string, to: string): QMoveRecord {
+    const piece = this.state.pieces[pieceId]
+    if (!piece || !piece.alive || piece.positions[from] === undefined) {
+      throw new Error('Estado cuántico inválido para fusión')
+    }
+
+    const legalTargets = new Set(this.getMergeTargets(pieceId, from))
+    if (!legalTargets.has(to)) throw new Error('Fusión inválida')
+
+    const partner = Object.keys(piece.positions).find((sq) => {
+      if (sq === from) return false
+      return this.getLegalMoves(pieceId, sq).some(m => !m.isCapture && m.square === to)
+    })
+    if (!partner) throw new Error('No hay segundo estado compatible para fusionar')
+
+    const mergedProbability = (piece.positions[from] ?? 0) + (piece.positions[partner] ?? 0)
+    delete piece.positions[from]
+    delete piece.positions[partner]
+    piece.positions[to] = (piece.positions[to] ?? 0) + mergedProbability
 
     // Limpiar entrelazamientos asociados
     this.state.entanglements = this.state.entanglements.filter(e => {
@@ -418,10 +440,15 @@ export class QuantumChessEngine {
       return true
     })
 
-    const desc = `${LABELS[piece.type]} fusionado en ${to} (100%)`
+    const remainingSquares = Object.keys(piece.positions)
+    if (remainingSquares.length === 1) {
+      piece.positions[remainingSquares[0]] = 1
+    }
+
+    const desc = `${LABELS[piece.type]} fusionado en ${to} (${Math.round((piece.positions[to] ?? 0) * 100)}%)`
     const record: QMoveRecord = {
       pieceId, pieceType: piece.type, color: piece.color,
-      moveType: 'merge', from: '*', to, description: desc,
+      moveType: 'merge', from, to, description: desc,
     }
     this.state.history.push(record)
     this._endTurn()
@@ -589,27 +616,20 @@ export class QuantumChessEngine {
     const fwd1 = rc2sq(f, r + dir)
     if (fwd1) {
       const cells = board[fwd1] || []
-      const hasClassical = cells.some(c => c.probability >= 1)
-      if (!hasClassical) {
-        const tunneled = cells.filter(c => c.probability < 1).length > 0 ? [fwd1] : []
-        if (cells.filter(c => c.color === piece.color).length === 0 || tunneled.length > 0) {
-          moves.push({ square: fwd1, isCapture: false, tunnelThrough: tunneled })
+      if (cells.length === 0) {
+        moves.push({ square: fwd1, isCapture: false, tunnelThrough: [] })
 
           // Avance 2 desde posición inicial
           if (r === startRank) {
             const fwd2 = rc2sq(f, r + 2 * dir)
             if (fwd2) {
               const cells2 = board[fwd2] || []
-              const hasClassical2 = cells2.some(c => c.probability >= 1)
-              if (!hasClassical2) {
-                const tunneled2 = [...tunneled]
-                if (cells2.filter(c => c.probability < 1).length > 0) tunneled2.push(fwd2)
-                moves.push({ square: fwd2, isCapture: false, tunnelThrough: tunneled2 })
+              if (cells2.length === 0) {
+                moves.push({ square: fwd2, isCapture: false, tunnelThrough: [] })
               }
             }
           }
         }
-      }
     }
 
     // Capturas diagonales
