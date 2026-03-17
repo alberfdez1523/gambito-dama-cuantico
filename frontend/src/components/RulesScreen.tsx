@@ -65,6 +65,18 @@ function makeGrid(rows: number, cols: number): MiniSquare[][] {
   )
 }
 
+function placeMiniSquare(
+  grid: MiniSquare[][],
+  row: number,
+  col: number,
+  patch: Omit<MiniSquare, 'isLight'>,
+) {
+  grid[row][col] = {
+    ...grid[row][col],
+    ...patch,
+  }
+}
+
 type Tab = 'classic' | 'quantum'
 
 export default function RulesScreen({ onBack, language }: RulesScreenProps) {
@@ -81,15 +93,15 @@ export default function RulesScreen({ onBack, language }: RulesScreenProps) {
         : 'Each piece moves uniquely: the pawn advances, the rook in straight lines, the bishop diagonally, the knight in an "L" shape, the queen combines rook and bishop, and the king moves one square in any direction.',
       board: (() => {
         const g = makeGrid(5, 5)
-        g[2][2] = { isLight: true, piece: '♞', highlight: 'selected' }
-        g[0][1] = { isLight: false, highlight: 'target' }
-        g[0][3] = { isLight: false, highlight: 'target' }
-        g[1][0] = { isLight: true, highlight: 'target' }
-        g[1][4] = { isLight: true, highlight: 'target' }
-        g[3][0] = { isLight: false, highlight: 'target' }
-        g[3][4] = { isLight: false, highlight: 'target' }
-        g[4][1] = { isLight: true, highlight: 'target' }
-        g[4][3] = { isLight: true, highlight: 'target' }
+        placeMiniSquare(g, 2, 2, { piece: '♞', highlight: 'selected' })
+        placeMiniSquare(g, 0, 1, { highlight: 'target' })
+        placeMiniSquare(g, 0, 3, { highlight: 'target' })
+        placeMiniSquare(g, 1, 0, { highlight: 'target' })
+        placeMiniSquare(g, 1, 4, { highlight: 'target' })
+        placeMiniSquare(g, 3, 0, { highlight: 'target' })
+        placeMiniSquare(g, 3, 4, { highlight: 'target' })
+        placeMiniSquare(g, 4, 1, { highlight: 'target' })
+        placeMiniSquare(g, 4, 3, { highlight: 'target' })
         return g
       })(),
     },
@@ -101,9 +113,9 @@ export default function RulesScreen({ onBack, language }: RulesScreenProps) {
         : 'When the king is threatened, it is in check. If it cannot escape, block, or capture the attacker, it is checkmate and the game ends.',
       board: (() => {
         const g = makeGrid(4, 5)
-        g[0][4] = { isLight: true, piece: '♚', highlight: 'check' }
-        g[2][4] = { isLight: true, piece: '♖' }
-        g[2][2] = { isLight: true, piece: '♕' }
+        placeMiniSquare(g, 0, 4, { piece: '♚', highlight: 'check' })
+        placeMiniSquare(g, 2, 4, { piece: '♖' })
+        placeMiniSquare(g, 2, 2, { piece: '♕' })
         return g
       })(),
     },
@@ -115,13 +127,13 @@ export default function RulesScreen({ onBack, language }: RulesScreenProps) {
         : 'The king moves two squares toward a rook, and the rook jumps to the king\'s other side. Only if neither has moved, no pieces are between them, and the king is not in check.',
       board: (() => {
         const g = makeGrid(2, 5)
-        g[1][0] = { isLight: false, piece: '♜' }
-        g[1][1] = { isLight: true, highlight: 'target' }
-        g[1][2] = { isLight: false, piece: '♚', highlight: 'selected' }
-        g[1][3] = { isLight: true, highlight: 'target' }
-        g[1][4] = { isLight: false, piece: '♜' }
-        g[0][1] = { isLight: true, piece: '♜', label: '→' }
-        g[0][3] = { isLight: false, piece: '♜', label: '←' }
+        placeMiniSquare(g, 1, 0, { piece: '♜' })
+        placeMiniSquare(g, 1, 1, { highlight: 'target' })
+        placeMiniSquare(g, 1, 2, { piece: '♚', highlight: 'selected' })
+        placeMiniSquare(g, 1, 3, { highlight: 'target' })
+        placeMiniSquare(g, 1, 4, { piece: '♜' })
+        placeMiniSquare(g, 0, 1, { piece: '♜', label: '→' })
+        placeMiniSquare(g, 0, 3, { piece: '♜', label: '←' })
         return g
       })(),
     },
@@ -133,11 +145,11 @@ export default function RulesScreen({ onBack, language }: RulesScreenProps) {
         : 'When a pawn reaches the last rank, it promotes to a queen, rook, bishop, or knight.',
       board: (() => {
         const g = makeGrid(3, 4)
-        g[1][1] = { isLight: false, piece: '♟', highlight: 'selected' }
-        g[0][1] = { isLight: true, highlight: 'target' }
-        g[0][0] = { isLight: false, piece: '♛', label: '?' }
-        g[0][2] = { isLight: false, piece: '♜', label: '?' }
-        g[0][3] = { isLight: true, piece: '♞', label: '?' }
+        placeMiniSquare(g, 1, 1, { piece: '♟', highlight: 'selected' })
+        placeMiniSquare(g, 0, 1, { highlight: 'target' })
+        placeMiniSquare(g, 0, 0, { piece: '♛', label: '?' })
+        placeMiniSquare(g, 0, 2, { piece: '♜', label: '?' })
+        placeMiniSquare(g, 0, 3, { piece: '♞', label: '?' })
         return g
       })(),
     },
@@ -149,9 +161,9 @@ export default function RulesScreen({ onBack, language }: RulesScreenProps) {
         : 'The game can end in a draw by stalemate (no legal moves while not in check), threefold repetition, insufficient material (e.g., king vs king), or the 50-move rule.',
       board: (() => {
         const g = makeGrid(3, 3)
-        g[0][0] = { isLight: true, piece: '♚' }
-        g[2][2] = { isLight: true, piece: '♔' }
-        g[1][2] = { isLight: false, piece: '♕' }
+        placeMiniSquare(g, 0, 0, { piece: '♚' })
+        placeMiniSquare(g, 2, 2, { piece: '♔' })
+        placeMiniSquare(g, 1, 2, { piece: '♕' })
         return g
       })(),
     },
@@ -169,8 +181,8 @@ export default function RulesScreen({ onBack, language }: RulesScreenProps) {
         : 'Works exactly like traditional chess: select a piece and move it to a legal square. The piece stays at 100% on the destination.',
       board: (() => {
         const g = makeGrid(4, 5)
-        g[2][1] = { isLight: false, piece: '♞', highlight: 'selected' }
-        g[0][2] = { isLight: true, highlight: 'target' }
+        placeMiniSquare(g, 2, 1, { piece: '♞', highlight: 'selected' })
+        placeMiniSquare(g, 0, 2, { highlight: 'target' })
         return g
       })(),
     },
@@ -184,9 +196,9 @@ export default function RulesScreen({ onBack, language }: RulesScreenProps) {
         : 'The piece splits into two simultaneous positions (superposition). Choose two target squares: the piece will exist at 50% in each. Pawns cannot make quantum moves.',
       board: (() => {
         const g = makeGrid(5, 5)
-        g[3][2] = { isLight: false, piece: '♝', highlight: 'selected' }
-        g[1][0] = { isLight: false, piece: '♝', highlight: 'quantum', label: '50%' }
-        g[1][4] = { isLight: false, piece: '♝', highlight: 'quantum', label: '50%' }
+        placeMiniSquare(g, 3, 2, { piece: '♝', highlight: 'selected' })
+        placeMiniSquare(g, 1, 0, { piece: '♝', highlight: 'quantum', label: '50%' })
+        placeMiniSquare(g, 1, 4, { piece: '♝', highlight: 'quantum', label: '50%' })
         return g
       })(),
     },
@@ -200,10 +212,10 @@ export default function RulesScreen({ onBack, language }: RulesScreenProps) {
         : 'If a piece is split across two squares, you can reunite it: choose one of the two positions and the piece collapses to 100% there. Only works with pieces already in superposition.',
       board: (() => {
         const g = makeGrid(4, 5)
-        g[1][0] = { isLight: true, piece: '♜', highlight: 'quantum', label: '50%' }
-        g[1][4] = { isLight: true, piece: '♜', highlight: 'quantum', label: '50%' }
-        g[2][4] = { isLight: false, highlight: 'merge' }
-        g[3][2] = { isLight: false, piece: '♜', highlight: 'merge', label: '100%' }
+        placeMiniSquare(g, 1, 0, { piece: '♜', highlight: 'quantum', label: '50%' })
+        placeMiniSquare(g, 1, 4, { piece: '♜', highlight: 'quantum', label: '50%' })
+        placeMiniSquare(g, 2, 4, { highlight: 'merge' })
+        placeMiniSquare(g, 3, 2, { piece: '♜', highlight: 'merge', label: '100%' })
         return g
       })(),
     },
@@ -217,14 +229,14 @@ export default function RulesScreen({ onBack, language }: RulesScreenProps) {
         : 'When a capture involves a piece in superposition, the measurement roulette activates. The success probability depends on the piece\'s percentage on that square. The result can be "alive" (the piece was there) or "dead" (it was not there and collapses to its other position).',
       board: (() => {
         const g = makeGrid(4, 5)
-        g[2][1] = { isLight: false, piece: '♗', highlight: 'selected' }
-        g[0][3] = { isLight: false, piece: '♝', highlight: 'quantum', label: '50%' }
-        g[2][4] = { isLight: true, piece: '♝', label: '50%' }
+        placeMiniSquare(g, 2, 1, { piece: '♗', highlight: 'selected' })
+        placeMiniSquare(g, 0, 3, { piece: '♝', highlight: 'quantum', label: '50%' })
+        placeMiniSquare(g, 2, 4, { piece: '♝', label: '50%' })
         return g
       })(),
     },
     {
-      title: es ? 'Captura: Clásica → Clásica' : 'Capture: Classic → Classic',
+      title: es ? 'Captura de una pieza clásica a una pieza clásica' : 'Capture from a classic piece to a classic piece',
       icon: '⚔',
       color: 'text-neutral-300',
       bgColor: 'bg-surface-3 border-white/10',
@@ -233,13 +245,13 @@ export default function RulesScreen({ onBack, language }: RulesScreenProps) {
         : 'No measurement. The capture resolves like normal chess, without roulette.',
       board: (() => {
         const g = makeGrid(3, 4)
-        g[2][0] = { isLight: true, piece: '♖', highlight: 'selected' }
-        g[0][0] = { isLight: true, piece: '♜', highlight: 'target' }
+        placeMiniSquare(g, 2, 0, { piece: '♖', highlight: 'selected' })
+        placeMiniSquare(g, 0, 0, { piece: '♜', highlight: 'target' })
         return g
       })(),
     },
     {
-      title: es ? 'Captura: Clásica → Cuántica' : 'Capture: Classic → Quantum',
+      title: es ? 'Captura de una pieza clásica a una pieza cuántica' : 'Capture from a classic piece to a quantum piece',
       icon: '🎯',
       color: 'text-indigo-300',
       bgColor: 'bg-indigo-500/8 border-indigo-500/15',
@@ -248,15 +260,15 @@ export default function RulesScreen({ onBack, language }: RulesScreenProps) {
         : 'The TARGET piece (the one being captured) is measured. If "alive", it was really there and is captured. If "dead", the square was empty and the target piece collapses to its other position.',
       board: (() => {
         const g = makeGrid(4, 5)
-        g[2][1] = { isLight: false, piece: '♗' }
-        g[0][3] = { isLight: false, piece: '♝', highlight: 'quantum', label: '50%' }
-        g[2][4] = { isLight: true, piece: '♝', label: '50%' }
-        g[1][2] = { isLight: true, highlight: 'target' }
+        placeMiniSquare(g, 2, 1, { piece: '♗' })
+        placeMiniSquare(g, 0, 3, { piece: '♝', highlight: 'quantum', label: '50%' })
+        placeMiniSquare(g, 2, 4, { piece: '♝', label: '50%' })
+        placeMiniSquare(g, 1, 2, { highlight: 'target' })
         return g
       })(),
     },
     {
-      title: es ? 'Captura: Cuántica → Clásica' : 'Capture: Quantum → Classic',
+      title: es ? 'Captura de una pieza cuántica a una pieza clásica' : 'Capture from a quantum piece to a classic piece',
       icon: '🎲',
       color: 'text-amber-300',
       bgColor: 'bg-amber-500/8 border-amber-500/15',
@@ -265,14 +277,14 @@ export default function RulesScreen({ onBack, language }: RulesScreenProps) {
         : 'The ATTACKING piece is measured. If "alive", the attacker existed at that position and the capture completes. If "dead", it was not really there, the move fails, and the attacking piece collapses to its other position.',
       board: (() => {
         const g = makeGrid(4, 5)
-        g[2][0] = { isLight: true, piece: '♖', highlight: 'quantum', label: '50%' }
-        g[2][4] = { isLight: true, piece: '♖', label: '50%' }
-        g[0][0] = { isLight: true, piece: '♜', highlight: 'target' }
+        placeMiniSquare(g, 2, 0, { piece: '♖', highlight: 'quantum', label: '50%' })
+        placeMiniSquare(g, 2, 4, { piece: '♖', label: '50%' })
+        placeMiniSquare(g, 0, 0, { piece: '♜', highlight: 'target' })
         return g
       })(),
     },
     {
-      title: es ? 'Captura: Cuántica → Cuántica' : 'Capture: Quantum → Quantum',
+      title: es ? 'Captura de una pieza cuántica a una pieza cuántica' : 'Capture from a quantum piece to a quantum piece',
       icon: '⚛⚛',
       color: 'text-indigo-200',
       bgColor: 'bg-indigo-500/8 border-indigo-500/15',
@@ -281,11 +293,11 @@ export default function RulesScreen({ onBack, language }: RulesScreenProps) {
         : 'Resolved in two steps:\n1. First the attacker is measured. If it survives, proceed.\n2. Then the target is measured. If it survives, it is captured.\nIf either result is "dead", that piece collapses to its other position and that step of the capture fails.',
       board: (() => {
         const g = makeGrid(4, 6)
-        g[3][0] = { isLight: true, piece: '♖', highlight: 'quantum', label: '50%' }
-        g[3][3] = { isLight: false, piece: '♖', label: '50%' }
-        g[1][0] = { isLight: false, piece: '♜', highlight: 'quantum', label: '50%' }
-        g[1][5] = { isLight: false, piece: '♜', label: '50%' }
-        g[2][0] = { isLight: true, highlight: 'target' }
+        placeMiniSquare(g, 3, 0, { piece: '♖', highlight: 'quantum', label: '50%' })
+        placeMiniSquare(g, 3, 3, { piece: '♖', label: '50%' })
+        placeMiniSquare(g, 1, 0, { piece: '♜', highlight: 'quantum', label: '50%' })
+        placeMiniSquare(g, 1, 5, { piece: '♜', label: '50%' })
+        placeMiniSquare(g, 2, 0, { highlight: 'target' })
         return g
       })(),
     },
@@ -299,11 +311,10 @@ export default function RulesScreen({ onBack, language }: RulesScreenProps) {
         : 'Similar to classic castling, but king and rook become entangled: in superposition between their original position and the castled position. When one is measured, the other collapses to the corresponding state.',
       board: (() => {
         const g = makeGrid(3, 5)
-        g[2][0] = { isLight: false, piece: '♜', label: '50%' }
-        g[2][2] = { isLight: false, piece: '♚', label: '50%' }
-        g[0][1] = { isLight: false, piece: '♜', highlight: 'quantum', label: '50%' }
-        g[0][0] = { isLight: true, piece: '♚', highlight: 'quantum', label: '50%' }
-        g[1][2] = { isLight: true }
+        placeMiniSquare(g, 2, 0, { piece: '♜', label: '50%' })
+        placeMiniSquare(g, 2, 2, { piece: '♚', label: '50%' })
+        placeMiniSquare(g, 0, 1, { piece: '♜', highlight: 'quantum', label: '50%' })
+        placeMiniSquare(g, 0, 0, { piece: '♚', highlight: 'quantum', label: '50%' })
         return g
       })(),
     },
@@ -317,9 +328,9 @@ export default function RulesScreen({ onBack, language }: RulesScreenProps) {
         : 'Pieces can pass through squares occupied by pieces in superposition (quantum states). This simulates quantum tunneling, allowing moves that would be blocked in classic chess.',
       board: (() => {
         const g = makeGrid(4, 5)
-        g[3][2] = { isLight: false, piece: '♖', highlight: 'selected' }
-        g[1][2] = { isLight: false, piece: '♝', highlight: 'quantum', label: '50%' }
-        g[0][2] = { isLight: true, highlight: 'target' }
+        placeMiniSquare(g, 3, 2, { piece: '♖', highlight: 'selected' })
+        placeMiniSquare(g, 1, 2, { piece: '♝', highlight: 'quantum', label: '50%' })
+        placeMiniSquare(g, 0, 2, { highlight: 'target' })
         return g
       })(),
     },
@@ -333,9 +344,9 @@ export default function RulesScreen({ onBack, language }: RulesScreenProps) {
         : 'The game ends when a king is captured (there is no classic checkmate in quantum mode). Since kings can be in superposition, a successful measurement on a king in combat can end the game.',
       board: (() => {
         const g = makeGrid(3, 4)
-        g[1][1] = { isLight: false, piece: '♕', highlight: 'selected' }
-        g[1][2] = { isLight: true, piece: '♚', highlight: 'check', label: '50%' }
-        g[1][3] = { isLight: false, piece: '♚', label: '50%' }
+        placeMiniSquare(g, 1, 1, { piece: '♕', highlight: 'selected' })
+        placeMiniSquare(g, 1, 2, { piece: '♚', highlight: 'check', label: '50%' })
+        placeMiniSquare(g, 1, 3, { piece: '♚', label: '50%' })
         return g
       })(),
     },
@@ -359,7 +370,7 @@ export default function RulesScreen({ onBack, language }: RulesScreenProps) {
           </div>
           <button
             onClick={onBack}
-            className="text-xs text-neutral-500 transition-colors hover:text-white"
+            className="rounded-md border border-surface-4 bg-surface-1 px-4 py-2 text-sm font-semibold text-neutral-300 transition-colors hover:border-accent/30 hover:text-white"
           >
             ← {es ? 'Menú' : 'Menu'}
           </button>
