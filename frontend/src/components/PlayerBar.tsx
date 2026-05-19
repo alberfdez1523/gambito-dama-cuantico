@@ -28,7 +28,7 @@ export default function PlayerBar({
     >
       {/* Color indicator */}
       <div
-        className={`flex h-6 w-6 items-center justify-center rounded-full text-[10px]
+        className={`flex h-7 w-7 items-center justify-center rounded-full text-ui-xs
           ${color === 'w' ? 'player-avatar-white' : 'player-avatar-black'}`}
       >
         {color === 'w' ? '♔' : '♚'}
@@ -36,10 +36,10 @@ export default function PlayerBar({
 
       {/* Name + ELO */}
       <div className="flex items-baseline gap-1.5 min-w-0">
-        <span className={`text-sm font-semibold transition-colors ${isActive ? 'text-white' : 'text-neutral-500'}`}>
+        <span className={`text-ui-base font-semibold transition-colors ${isActive ? 'text-white' : 'text-neutral-500'}`}>
           {label}
         </span>
-        {elo && <span className="font-mono text-[10px] text-neutral-600">{elo}</span>}
+        {elo && <span className="font-mono text-ui-xs text-neutral-600">{elo}</span>}
         {isActive && <span className="h-1.5 w-1.5 rounded-full bg-accent" />}
       </div>
 
@@ -48,20 +48,20 @@ export default function PlayerBar({
         {sortedCaptures.map((p, i) => (
           <span
             key={i}
-            className={`text-[11px] leading-none opacity-60 ${capturedColor === 'w' ? 'piece-white' : 'piece-black'}`}
+            className={`text-ui-sm leading-none opacity-60 ${capturedColor === 'w' ? 'piece-white' : 'piece-black'}`}
           >
             {PIECE_UNICODE[`${capturedColor}${p.toUpperCase()}`] || ''}
           </span>
         ))}
         {materialDiff > 0 && (
-          <span className="ml-0.5 font-mono text-[10px] text-accent">+{materialDiff}</span>
+          <span className="ml-0.5 font-mono text-ui-xs text-accent">+{materialDiff}</span>
         )}
       </div>
 
       {/* Timer */}
       {time != null && (
         <span
-          className={`font-mono text-sm font-semibold tabular-nums
+          className={`font-mono text-ui-base font-semibold tabular-nums
             ${isLow ? 'text-red-400' : isActive ? 'text-white' : 'text-neutral-600'}`}
         >
           {formatTime(time)}

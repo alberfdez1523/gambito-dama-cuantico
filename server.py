@@ -10,16 +10,19 @@ Ejecución local:
     python server.py
 """
 
-import os, pathlib, json, sys, threading
+import os, pathlib, json, sys, threading, asyncio
 from concurrent.futures import CancelledError
 from contextlib import asynccontextmanager
+from functools import partial
+from typing import Literal
 
 import chess
 import chess.engine
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
+from fastapi.exceptions import RequestValidationError
 from pydantic import BaseModel
 
 # ---------------------------------------------------------------------------
@@ -78,10 +81,14 @@ def find_stockfish():
     return None
 
 STOCKFISH_PATH = find_stockfish()
-if STOCKFISH_PATH is None:
+SKIP_STOCKFISH = os.getenv("SKIP_STOCKFISH") == "1"
+
+if STOCKFISH_PATH is None and not SKIP_STOCKFISH:
     print("ERROR: Stockfish binary not found.")
     print("       Compile it first:  cd engine/stockfish/src && make -j2 build ARCH=x86-64")
     sys.exit(1)
+elif STOCKFISH_PATH is None:
+    print("WARNING: Stockfish not found (SKIP_STOCKFISH=1). Engine endpoints will be unavailable.")
 else:
     print(f"Stockfish found: {STOCKFISH_PATH}")
 
@@ -97,6 +104,8 @@ DIFFICULTIES = {
     "hard":     {"skill": 15, "depth": 14, "time": 0.6,  "elo": 2000},
     "master":   {"skill": 20, "depth": 20, "time": 1.0,  "elo": 2600},
 }
+
+DifficultyLevel = Literal["beginner", "easy", "medium", "hard", "master"]
 
 # ---------------------------------------------------------------------------
 # Motor global reutilizable
@@ -116,6 +125,35 @@ def _score_to_eval(score: chess.engine.PovScore) -> tuple[float, int | None]:
     return float(white_score.score(mate_score=10000)), None
 
 
+def _json_error(status_code: int, code: str, message: str) -> JSONResponse:
+    return JSONResponse(status_code=status_code, content={"error": message, "code": code})
+
+
+def _http_status_to_code(status_code: int) -> str:
+    return {
+        400: "BAD_REQUEST",
+        404: "NOT_FOUND",
+        422: "VALIDATION_ERROR",
+        503: "ENGINE_UNAVAILABLE",
+    }.get(status_code, "ERROR")
+
+
+def _engine_is_alive() -> bool:
+    global engine
+    if engine is None:
+        return False
+    try:
+        if hasattr(engine, "is_alive") and not engine.is_alive():
+            return False
+        with engine_lock:
+            if engine is None:
+                return False
+            engine.ping()
+        return True
+    except Exception:
+        return False
+
+
 def _with_engine_lock(callback):
     """Serializa acceso al motor compartido para evitar cancelaciones internas."""
     global engine
@@ -123,28 +161,40 @@ def _with_engine_lock(callback):
     with engine_lock:
         active_engine = engine
         if active_engine is None:
-            raise HTTPException(503, "Engine not ready")
+            raise HTTPException(status_code=503, detail={"error": "Engine not ready", "code": "ENGINE_UNAVAILABLE"})
 
         try:
             return callback(active_engine)
         except CancelledError as exc:
-            raise HTTPException(503, "Engine request was interrupted, retry the move") from exc
+            raise HTTPException(
+                status_code=503,
+                detail={"error": "Engine request was interrupted, retry the move", "code": "ENGINE_UNAVAILABLE"},
+            ) from exc
         except chess.engine.EngineTerminatedError as exc:
             engine = None
-            raise HTTPException(503, "Engine terminated unexpectedly") from exc
+            raise HTTPException(
+                status_code=503,
+                detail={"error": "Engine terminated unexpectedly", "code": "ENGINE_UNAVAILABLE"},
+            ) from exc
         except chess.engine.EngineError as exc:
-            raise HTTPException(503, f"Engine error: {exc}") from exc
+            raise HTTPException(
+                status_code=503,
+                detail={"error": f"Engine error: {exc}", "code": "ENGINE_UNAVAILABLE"},
+            ) from exc
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Ciclo de vida de FastAPI: arranque y apagado limpio del motor."""
     global engine
-    print("Starting Stockfish engine...")
-    with engine_lock:
-        engine = chess.engine.SimpleEngine.popen_uci(STOCKFISH_PATH)
-        # Ajustes conservadores para equipos normales.
-        engine.configure({"Threads": 2, "Hash": 128})
-    print("Engine ready")
+    if STOCKFISH_PATH and not SKIP_STOCKFISH:
+        print("Starting Stockfish engine...")
+        with engine_lock:
+            engine = chess.engine.SimpleEngine.popen_uci(STOCKFISH_PATH)
+            engine.configure({"Threads": 2, "Hash": 128})
+        print("Engine ready")
+    else:
+        engine = None
+        print("Skipping engine startup (test mode or no binary)")
     yield
     print("Shutting down engine...")
     with engine_lock:
@@ -154,6 +204,18 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Gambito de Dama Cuantico", lifespan=lifespan)
+
+
+@app.exception_handler(HTTPException)
+async def http_exception_handler(_request: Request, exc: HTTPException):
+    if isinstance(exc.detail, dict) and "error" in exc.detail and "code" in exc.detail:
+        return JSONResponse(status_code=exc.status_code, content=exc.detail)
+    return _json_error(exc.status_code, _http_status_to_code(exc.status_code), str(exc.detail))
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(_request: Request, exc: RequestValidationError):
+    return _json_error(422, "VALIDATION_ERROR", "Invalid request payload")
 
 app.add_middleware(
     CORSMiddleware,
@@ -168,7 +230,7 @@ app.add_middleware(
 # ---------------------------------------------------------------------------
 class MoveRequest(BaseModel):
     fen: str
-    difficulty: str = "medium"
+    difficulty: DifficultyLevel = "medium"
 
 class MoveResponse(BaseModel):
     bestmove: str          # UCI notation e.g. "e2e4"
@@ -209,7 +271,7 @@ class QuantumStatePayload(BaseModel):
 
 class QuantumMoveRequest(BaseModel):
     quantum_state: QuantumStatePayload
-    difficulty: str = "medium"
+    difficulty: DifficultyLevel = "medium"
 
 class QuantumMoveResponse(BaseModel):
     pieceId: str
@@ -362,29 +424,23 @@ def _build_board(classical_pieces, quantum_choices, turn, castling):
 # ---------------------------------------------------------------------------
 # Endpoints API
 # ---------------------------------------------------------------------------
-@app.post("/api/move", response_model=MoveResponse)
-def get_best_move(req: MoveRequest):
-    """Devuelve la mejor jugada de Stockfish para una posición FEN."""
-    preset = DIFFICULTIES.get(req.difficulty, DIFFICULTIES["medium"])
+def _get_best_move_sync(req: MoveRequest) -> MoveResponse:
+    preset = DIFFICULTIES[req.difficulty]
 
     try:
         board = chess.Board(req.fen)
     except ValueError:
-        raise HTTPException(400, "Invalid FEN")
+        raise HTTPException(status_code=400, detail={"error": "Invalid FEN", "code": "BAD_REQUEST"})
 
     if board.is_game_over():
-        raise HTTPException(400, "Game is already over")
+        raise HTTPException(status_code=400, detail={"error": "Game is already over", "code": "BAD_REQUEST"})
 
-    # Algunos binarios soportan Skill Level explícito.
-    # Si no lo soporta, continuamos con límites de profundidad/tiempo.
     def _run_move(active_engine: chess.engine.SimpleEngine):
         try:
             active_engine.configure({"Skill Level": preset["skill"]})
         except chess.engine.EngineError:
-            pass  # some builds don't support it
+            pass
 
-        # Combinamos límite por profundidad y por tiempo:
-        # termina al alcanzar el primero, dando buena respuesta en UI.
         limit = chess.engine.Limit(
             depth=preset["depth"],
             time=preset["time"],
@@ -399,7 +455,7 @@ def get_best_move(req: MoveRequest):
         evaluation, mate = _score_to_eval(result.info["score"])
 
     if result.move is None:
-        raise HTTPException(503, "Engine did not return a move")
+        raise HTTPException(status_code=503, detail={"error": "Engine did not return a move", "code": "ENGINE_UNAVAILABLE"})
 
     ponder_uci = result.ponder.uci() if result.ponder else None
     best_uci = result.move.uci()
@@ -412,13 +468,11 @@ def get_best_move(req: MoveRequest):
     )
 
 
-@app.post("/api/eval", response_model=EvalResponse)
-def get_evaluation(req: EvalRequest):
-    """Evalúa una posición sin pedir jugada."""
+def _get_evaluation_sync(req: EvalRequest) -> EvalResponse:
     try:
         board = chess.Board(req.fen)
     except ValueError:
-        raise HTTPException(400, "Invalid FEN")
+        raise HTTPException(status_code=400, detail={"error": "Invalid FEN", "code": "BAD_REQUEST"})
 
     info = _with_engine_lock(
         lambda active_engine: active_engine.analyse(
@@ -427,32 +481,47 @@ def get_evaluation(req: EvalRequest):
         )
     )
     if "score" not in info:
-        raise HTTPException(503, "Engine did not return an evaluation")
+        raise HTTPException(status_code=503, detail={"error": "Engine did not return an evaluation", "code": "ENGINE_UNAVAILABLE"})
 
     evaluation, mate = _score_to_eval(info["score"])
-
     return EvalResponse(evaluation=evaluation, mate=mate)
+
+
+@app.post("/api/move", response_model=MoveResponse)
+async def get_best_move(req: MoveRequest):
+    """Devuelve la mejor jugada de Stockfish para una posición FEN."""
+    loop = asyncio.get_running_loop()
+    return await loop.run_in_executor(None, partial(_get_best_move_sync, req))
+
+
+@app.post("/api/eval", response_model=EvalResponse)
+async def get_evaluation(req: EvalRequest):
+    """Evalúa una posición sin pedir jugada."""
+    loop = asyncio.get_running_loop()
+    return await loop.run_in_executor(None, partial(_get_evaluation_sync, req))
 
 
 @app.get("/api/health")
 def health():
     """Endpoint liviano para saber si backend+motor están listos."""
-    return {"status": "ok", "engine": STOCKFISH_PATH is not None}
+    alive = _engine_is_alive()
+    return {
+        "status": "ok" if alive else "degraded",
+        "engine": alive,
+        "engine_path": STOCKFISH_PATH,
+    }
 
 
 # ---------------------------------------------------------------------------
 # Endpoint Cuántico — Enfoque Multiverso
 # ---------------------------------------------------------------------------
-@app.post("/api/quantum/move")
-def quantum_move(req: QuantumMoveRequest):
-    """Evalúa todos los tableros clásicos posibles del estado cuántico
-    y devuelve la mejor jugada ponderada por probabilidad."""
-    preset = DIFFICULTIES.get(req.difficulty, DIFFICULTIES["medium"])
+def _quantum_move_sync(req: QuantumMoveRequest):
+    preset = DIFFICULTIES[req.difficulty]
 
     # 1) Generar todos los universos clásicos
     boards = _generate_classical_boards(req.quantum_state)
     if not boards:
-        raise HTTPException(400, "No valid classical boards could be generated")
+        raise HTTPException(status_code=400, detail={"error": "No valid classical boards could be generated", "code": "BAD_REQUEST"})
 
     # 2) Para cada universo, pedir a Stockfish la mejor jugada
     move_votes: dict[str, float] = {}    # move_uci → suma de probabilidades
@@ -502,7 +571,7 @@ def quantum_move(req: QuantumMoveRequest):
     _with_engine_lock(_run_quantum)
 
     if not move_votes:
-        raise HTTPException(400, "No legal moves found in any universe")
+        raise HTTPException(status_code=400, detail={"error": "No legal moves found in any universe", "code": "BAD_REQUEST"})
 
     # 3) Elegir movimiento con mayor voto ponderado
     best_move = max(move_votes, key=move_votes.get)
@@ -526,6 +595,14 @@ def quantum_move(req: QuantumMoveRequest):
         "weightedEval": round(weighted_eval, 1),
         "universeCount": len(boards),
     }
+
+
+@app.post("/api/quantum/move")
+async def quantum_move(req: QuantumMoveRequest):
+    """Evalúa todos los tableros clásicos posibles del estado cuántico
+    y devuelve la mejor jugada ponderada por probabilidad."""
+    loop = asyncio.get_running_loop()
+    return await loop.run_in_executor(None, partial(_quantum_move_sync, req))
 
 
 # ---------------------------------------------------------------------------

@@ -5,7 +5,12 @@ const LOCAL_DEV_API_BASE = 'http://localhost:8000/api'
 
 let cachedApiBase: string | null = explicitApiBase || null
 
-function getApiCandidates(): string[] {
+export interface APIErrorBody {
+  error: string
+  code: string
+}
+
+export function getApiCandidates(): string[] {
   const candidates = new Set<string>()
 
   if (explicitApiBase) candidates.add(explicitApiBase)
@@ -19,6 +24,16 @@ function getApiCandidates(): string[] {
   }
 
   return [...candidates]
+}
+
+export async function parseAPIError(res: Response): Promise<string> {
+  try {
+    const data = await res.json() as Partial<APIErrorBody>
+    if (data.error) return data.error
+  } catch {
+    /* not JSON */
+  }
+  return `Error del servidor: ${res.status}`
 }
 
 async function apiFetch(path: string, init?: RequestInit): Promise<Response> {
@@ -59,7 +74,7 @@ export async function requestAIMove(
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ fen, difficulty }),
   })
-  if (!res.ok) throw new Error(`Error del servidor: ${res.status}`)
+  if (!res.ok) throw new Error(await parseAPIError(res))
   return res.json()
 }
 
@@ -69,7 +84,7 @@ export async function requestEval(fen: string): Promise<{ evaluation: number; ma
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ fen }),
   })
-  if (!res.ok) throw new Error(`Error del servidor: ${res.status}`)
+  if (!res.ok) throw new Error(await parseAPIError(res))
   return res.json()
 }
 
@@ -78,7 +93,7 @@ export async function checkHealth(): Promise<boolean> {
     const res = await apiFetch('/health', { signal: AbortSignal.timeout(5000) })
     if (!res.ok) return false
     const data = await res.json() as { engine?: boolean }
-    return !!data.engine
+    return data.engine === true
   } catch {
     return false
   }

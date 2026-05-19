@@ -1,22 +1,42 @@
 import { useState, useCallback, useEffect, lazy, Suspense } from 'react'
-import { AnimatePresence, motion } from 'framer-motion'
+import { flushSync } from 'react-dom'
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import StartMenu from './components/StartMenu'
 import GameScreen from './components/GameScreen'
 import QuantumGameScreen from './components/QuantumGameScreen'
+import SettingsPanel from './components/SettingsPanel'
+import BoardSkeleton from './components/BoardSkeleton'
 const RulesScreen = lazy(() => import('./components/RulesScreen'))
-import type { GameConfig, Language } from './lib/types'
+import type { GameConfig } from './lib/types'
+import { loadSettings, saveSettings, type AppSettings } from './lib/settings'
+import {
+  applyThemeToDom,
+  runThemeTransition,
+  type SettingsChangeMeta,
+} from './lib/themeTransition'
+import { ui } from './lib/i18n'
+
+function RulesLoadingFallback({ language }: { language: AppSettings['language'] }) {
+  return (
+    <div className="flex min-h-screen flex-col items-center justify-center gap-6 bg-surface-0 px-4">
+      <BoardSkeleton />
+      <span className="text-sm text-neutral-600">{ui(language).loadingRules}</span>
+    </div>
+  )
+}
 
 export default function App() {
   const [screen, setScreen] = useState<'menu' | 'game' | 'rules'>('menu')
   const [gameConfig, setGameConfig] = useState<GameConfig | null>(null)
-  const [theme, setTheme] = useState<'dark' | 'light'>('dark')
-  const [language, setLanguage] = useState<Language>('es')
+  const [settings, setSettings] = useState<AppSettings>(() => loadSettings())
+  const [settingsOpen, setSettingsOpen] = useState(false)
+  const reduceMotion = useReducedMotion()
+
+  const { language } = settings
 
   useEffect(() => {
-    const root = document.documentElement
-    root.classList.remove('theme-dark', 'theme-light')
-    root.classList.add(theme === 'dark' ? 'theme-dark' : 'theme-light')
-  }, [theme])
+    applyThemeToDom(settings.theme)
+  }, [])
 
   useEffect(() => {
     const modeLabel = gameConfig?.gameMode === 'quantum'
@@ -24,6 +44,31 @@ export default function App() {
       : ''
     document.title = `Gambito de Dama Cuántico${modeLabel}`
   }, [gameConfig, language])
+
+  const handleSettingsChange = useCallback(
+    (partial: Partial<AppSettings>, meta?: SettingsChangeMeta) => {
+      setSettings((prev) => {
+        const next = { ...prev, ...partial }
+        if (partial.theme !== undefined && partial.theme !== prev.theme) {
+          runThemeTransition(
+            partial.theme,
+            () => {
+              flushSync(() => {
+                setSettings(saveSettings(next))
+              })
+            },
+            {
+              reducedMotion: !!reduceMotion,
+              origin: meta?.themeOrigin,
+            },
+          )
+          return prev
+        }
+        return saveSettings(next)
+      })
+    },
+    [reduceMotion],
+  )
 
   const handlePlay = useCallback((config: GameConfig) => {
     setGameConfig(config)
@@ -35,24 +80,19 @@ export default function App() {
     setScreen('menu')
   }, [])
 
+  const transition = reduceMotion
+    ? { duration: 0.01 }
+    : { duration: 0.25, ease: 'easeOut' as const }
+
   return (
     <>
-      {/* Minimal floating controls */}
-      <div className="fixed bottom-3 right-3 z-[60] flex items-center gap-2 text-[10px] font-medium text-neutral-600">
-        <button
-          onClick={() => setLanguage(prev => (prev === 'es' ? 'en' : 'es'))}
-          className="rounded px-2 py-1 transition-colors hover:bg-surface-2 hover:text-neutral-300"
-        >
-          {language === 'es' ? 'EN' : 'ES'}
-        </button>
-        <span className="text-surface-4">·</span>
-        <button
-          onClick={() => setTheme(prev => (prev === 'dark' ? 'light' : 'dark'))}
-          className="rounded px-2 py-1 transition-colors hover:bg-surface-2 hover:text-neutral-300"
-        >
-          {theme === 'dark' ? '☀' : '●'}
-        </button>
-      </div>
+      <SettingsPanel
+        open={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+        settings={settings}
+        onChange={handleSettingsChange}
+        language={language}
+      />
 
       <AnimatePresence mode="wait">
         {screen === 'menu' ? (
@@ -61,9 +101,14 @@ export default function App() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.25, ease: 'easeOut' }}
+            transition={transition}
           >
-            <StartMenu onPlay={handlePlay} onRules={() => setScreen('rules')} language={language} />
+            <StartMenu
+              onPlay={handlePlay}
+              onRules={() => setScreen('rules')}
+              language={language}
+              onOpenSettings={() => setSettingsOpen(true)}
+            />
           </motion.div>
         ) : screen === 'rules' ? (
           <motion.div
@@ -71,9 +116,9 @@ export default function App() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.25, ease: 'easeOut' }}
+            transition={transition}
           >
-            <Suspense fallback={<div className="flex min-h-screen items-center justify-center bg-surface-0"><span className="text-sm text-neutral-600">Loading…</span></div>}>
+            <Suspense fallback={<RulesLoadingFallback language={language} />}>
               <RulesScreen onBack={() => setScreen('menu')} language={language} />
             </Suspense>
           </motion.div>
@@ -83,12 +128,26 @@ export default function App() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.25, ease: 'easeOut' }}
+            transition={transition}
           >
             {gameConfig.gameMode === 'quantum' ? (
-              <QuantumGameScreen config={gameConfig} onNewGame={handleNewGame} language={language} />
+              <QuantumGameScreen
+                config={gameConfig}
+                onNewGame={handleNewGame}
+                language={language}
+                settings={settings}
+                onOpenSettings={() => setSettingsOpen(true)}
+                onSettingsChange={handleSettingsChange}
+              />
             ) : (
-              <GameScreen config={gameConfig} onNewGame={handleNewGame} language={language} />
+              <GameScreen
+                config={gameConfig}
+                onNewGame={handleNewGame}
+                language={language}
+                settings={settings}
+                onOpenSettings={() => setSettingsOpen(true)}
+                onSettingsChange={handleSettingsChange}
+              />
             )}
           </motion.div>
         ) : null}

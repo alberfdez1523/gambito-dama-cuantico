@@ -9,9 +9,10 @@ interface StartMenuProps {
   onPlay: (config: GameConfig) => void
   onRules: () => void
   language: Language
+  onOpenSettings: () => void
 }
 
-export default function StartMenu({ onPlay, onRules, language }: StartMenuProps) {
+export default function StartMenu({ onPlay, onRules, language, onOpenSettings }: StartMenuProps) {
   const [color, setColor] = useState<PlayerColorChoice>('w')
   const [difficulty, setDifficulty] = useState<Difficulty>('medium')
   const [opponentMode, setOpponentMode] = useState<OpponentMode>('ai')
@@ -51,6 +52,7 @@ export default function StartMenu({ onPlay, onRules, language }: StartMenuProps)
         looking: 'Buscando servidor…',
         offline: 'Sin conexión',
         rules: 'Reglas del juego',
+        settings: 'Ajustes',
       }
     : {
         subtitle: isQuantum ? 'Local quantum mode · 2 players' : 'Classic vs Stockfish or 2 players',
@@ -77,6 +79,7 @@ export default function StartMenu({ onPlay, onRules, language }: StartMenuProps)
         looking: 'Looking for server…',
         offline: 'Offline',
         rules: 'Game rules',
+        settings: 'Settings',
       }
 
   useEffect(() => {
@@ -132,7 +135,7 @@ export default function StartMenu({ onPlay, onRules, language }: StartMenuProps)
             <p className="max-w-xs text-sm leading-relaxed text-neutral-500">
               {t.tagline}
             </p>
-            <p className="mt-2 text-xs text-neutral-600">
+            <p className="mt-2 text-ui-sm text-neutral-600">
               {t.subtitle}
             </p>
           </motion.div>
@@ -152,12 +155,12 @@ export default function StartMenu({ onPlay, onRules, language }: StartMenuProps)
               <span className="font-serif text-3xl text-accent">♛</span>
               <div>
                 <h1 className="font-serif text-lg text-white">Gambito de Dama</h1>
-                <span className="text-[10px] font-semibold uppercase tracking-[0.15em] text-accent">
+                <span className="text-ui-xs font-semibold uppercase tracking-[0.15em] text-accent">
                   {t.quantum}
                 </span>
               </div>
             </div>
-            <p className="mt-2 text-xs text-neutral-500">{t.subtitle}</p>
+            <p className="mt-2 text-ui-sm text-neutral-500">{t.subtitle}</p>
           </motion.div>
 
           <div className="w-full max-w-md">
@@ -175,7 +178,7 @@ export default function StartMenu({ onPlay, onRules, language }: StartMenuProps)
                       setGameMode(opt.value)
                       if (opt.value === 'quantum') { setOpponentMode('local'); setColor('w') }
                     }}
-                    className={`flex-1 py-3 text-center text-xs font-semibold uppercase tracking-wider transition-colors
+                    className={`flex-1 py-3 text-center text-ui-sm font-semibold uppercase tracking-wider transition-colors
                       ${i > 0 ? 'border-l border-surface-4' : ''}
                       ${gameMode === opt.value
                         ? opt.value === 'quantum'
@@ -202,7 +205,7 @@ export default function StartMenu({ onPlay, onRules, language }: StartMenuProps)
                   <button
                     key={opt.value}
                     onClick={() => setColor(opt.value)}
-                    className={`flex-1 py-3 text-center text-xs font-semibold transition-colors
+                    className={`flex-1 py-3 text-center text-ui-sm font-semibold transition-colors
                       ${i > 0 ? 'border-l border-surface-4' : ''}
                       ${color === opt.value
                         ? 'bg-accent/10 text-accent'
@@ -227,7 +230,7 @@ export default function StartMenu({ onPlay, onRules, language }: StartMenuProps)
                     <button
                       key={opt.value}
                       onClick={() => setOpponentMode(opt.value)}
-                      className={`flex-1 py-3 text-center text-xs font-semibold transition-colors
+                      className={`flex-1 py-3 text-center text-ui-sm font-semibold transition-colors
                         ${i > 0 ? 'border-l border-surface-4' : ''}
                         ${opponentMode === opt.value
                           ? 'bg-accent/10 text-accent'
@@ -241,7 +244,7 @@ export default function StartMenu({ onPlay, onRules, language }: StartMenuProps)
               </motion.div>
             ) : (
               <motion.div
-                className="mb-7 rounded border border-indigo-500/20 bg-indigo-500/5 px-4 py-3 text-xs text-indigo-300"
+                className="mb-7 rounded border border-indigo-500/20 bg-indigo-500/5 px-4 py-3 text-ui-sm text-indigo-300"
                 custom={2} variants={stagger} initial="hidden" animate="show"
               >
                 ⚛ {t.quantumInfo}
@@ -252,7 +255,7 @@ export default function StartMenu({ onPlay, onRules, language }: StartMenuProps)
             <motion.div className="mb-7" custom={3} variants={stagger} initial="hidden" animate="show">
               <Label>{t.difficulty}</Label>
               {gameMode === 'classic' && opponentMode === 'local' && (
-                <p className="mb-2 text-[11px] text-neutral-600">{t.diffUnused}</p>
+                <p className="mb-2 text-ui-sm text-neutral-600">{t.diffUnused}</p>
               )}
               <div className="flex overflow-hidden rounded border border-surface-4">
                 {DIFFICULTIES.map((d, i) => (
@@ -282,7 +285,7 @@ export default function StartMenu({ onPlay, onRules, language }: StartMenuProps)
                         />
                       ))}
                     </div>
-                    <span className="text-[9px] font-semibold leading-tight">
+                    <span className="text-ui-xs font-semibold leading-tight">
                       {getDifficultyLabel(d.key, language)}
                     </span>
                   </button>
@@ -318,7 +321,7 @@ export default function StartMenu({ onPlay, onRules, language }: StartMenuProps)
                       <button
                         key={tm}
                         onClick={() => setTimerMinutes(tm)}
-                        className={`flex-1 py-2.5 text-center text-xs font-medium transition-colors
+                        className={`flex-1 py-2.5 text-center text-ui-sm font-medium transition-colors
                           ${i > 0 ? 'border-l border-surface-4' : ''}
                           ${timerMinutes === tm
                             ? 'bg-accent/10 text-accent'
@@ -340,7 +343,7 @@ export default function StartMenu({ onPlay, onRules, language }: StartMenuProps)
               <button
                 onClick={handlePlay}
                 disabled={!canPlay}
-                className={`w-full rounded py-4 text-xs font-semibold uppercase tracking-[0.2em] transition-all
+                className={`w-full rounded py-4 text-ui-sm font-semibold uppercase tracking-[0.2em] transition-all
                   ${canPlay
                     ? isQuantum
                       ? 'border-2 border-indigo-400 bg-indigo-500/5 text-indigo-300 hover:bg-indigo-500 hover:text-white'
@@ -359,12 +362,22 @@ export default function StartMenu({ onPlay, onRules, language }: StartMenuProps)
               className="mt-6 flex items-center justify-between"
               custom={6} variants={stagger} initial="hidden" animate="show"
             >
-              <button
-                onClick={onRules}
-                className="text-xs font-medium text-neutral-500 transition-colors hover:text-accent"
-              >
-                {t.rules} →
-              </button>
+              <div className="flex items-center gap-4">
+                <button
+                  type="button"
+                  onClick={onRules}
+                  className="min-h-[44px] text-ui-sm font-medium text-neutral-500 transition-colors hover:text-accent"
+                >
+                  {t.rules} →
+                </button>
+                <button
+                  type="button"
+                  onClick={onOpenSettings}
+                  className="min-h-[44px] text-ui-sm font-medium text-neutral-500 transition-colors hover:text-accent"
+                >
+                  ⚙ {t.settings}
+                </button>
+              </div>
 
               {gameMode === 'classic' && (
                 <div className="flex items-center gap-2">
@@ -373,7 +386,7 @@ export default function StartMenu({ onPlay, onRules, language }: StartMenuProps)
                       serverReady ? 'bg-emerald-500' : checking ? 'bg-amber-500 animate-pulse' : 'bg-red-500'
                     }`}
                   />
-                  <span className="text-[10px] text-neutral-600">
+                  <span className="text-ui-xs text-neutral-600">
                     {serverReady ? t.ready : checking ? t.looking : t.offline}
                   </span>
                 </div>
@@ -388,7 +401,7 @@ export default function StartMenu({ onPlay, onRules, language }: StartMenuProps)
 
 function Label({ children, className = '' }: { children: React.ReactNode; className?: string }) {
   return (
-    <label className={`mb-2.5 block text-[10px] font-semibold uppercase tracking-[0.15em] text-neutral-500 ${className}`}>
+    <label className={`mb-2.5 block text-ui-xs font-semibold uppercase tracking-[0.15em] text-neutral-500 ${className}`}>
       {children}
     </label>
   )

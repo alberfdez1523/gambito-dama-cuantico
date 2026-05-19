@@ -2,7 +2,7 @@ import { useState, useRef, useCallback, useMemo, useEffect } from 'react'
 import { Chess } from 'chess.js'
 import { requestAIMove, requestEval } from '../lib/api'
 import { PIECE_VALUES, FILES } from '../lib/constants'
-import { getColorName, getPieceName, translateGameOverInfo } from '../lib/i18n'
+import { getColorName, getPieceName, translateGameOverInfo, ui } from '../lib/i18n'
 import type {
   GameConfig,
   Language,
@@ -99,16 +99,27 @@ export interface GameSounds {
 export function useChessGame(config: GameConfig, sounds: GameSounds, language: Language) {
   const gameRef = useRef(new Chess())
   const isThinkingRef = useRef(false)
+  const evalFailCountRef = useRef(0)
 
   const [fen, setFen] = useState(gameRef.current.fen())
   const [selectedSquare, setSelectedSquare] = useState<string | null>(null)
   const [lastMove, setLastMove] = useState<{ from: string; to: string } | null>(null)
   const [boardFlipped, setBoardFlipped] = useState(config.playerColor === 'b')
   const [isThinking, setIsThinking] = useState(false)
+  const [engineError, setEngineError] = useState<string | null>(null)
+  const [evalError, setEvalError] = useState<string | null>(null)
+  const [aiRetryToken, setAiRetryToken] = useState(0)
+  const [boardReady, setBoardReady] = useState(false)
   const [chances, setChances] = useState<Chances>({ white: 33, draw: 34, black: 33 })
   const [promotionPending, setPromotionPending] = useState<{ from: string; to: string } | null>(null)
   const [gameOverInfo, setGameOverInfo] = useState<GameOverInfo | null>(null)
   const isAIMode = config.opponentMode === 'ai'
+  const t = ui(language)
+
+  useEffect(() => {
+    const timer = setTimeout(() => setBoardReady(true), 80)
+    return () => clearTimeout(timer)
+  }, [])
 
   // ─── Valores derivados ───
 
@@ -186,12 +197,21 @@ export function useChessGame(config: GameConfig, sounds: GameSounds, language: L
   const status = useMemo(() => {
     if (gameOverInfo) return { text: translateGameOverInfo(gameOverInfo, language).title, type: 'over' as const }
     if (isAIMode) {
-      if (isThinking) return { text: language === 'es' ? 'La IA está pensando...' : 'The AI is thinking...', type: 'thinking' as const }
-      if (turn === config.playerColor) return { text: language === 'es' ? 'Tu turno' : 'Your turn', type: 'player' as const }
-      return { text: language === 'es' ? 'Turno de la IA' : 'AI turn', type: 'ai' as const }
+      if (isThinking) return { text: t.aiThinking, type: 'thinking' as const }
+      if (turn === config.playerColor) return { text: t.yourTurn, type: 'player' as const }
+      return { text: t.aiTurn, type: 'ai' as const }
     }
-    return { text: language === 'es' ? `Turno: ${getColorName(turn, language)}` : `${getColorName(turn, language)} to move`, type: 'player' as const }
-  }, [gameOverInfo, isThinking, turn, config.playerColor, isAIMode, language])
+    return { text: t.turnColor(getColorName(turn, language)), type: 'player' as const }
+  }, [gameOverInfo, isThinking, turn, config.playerColor, isAIMode, language, t])
+
+  const pgn = useMemo(() => {
+    try {
+      return gameRef.current.pgn()
+    } catch {
+      return ''
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fen])
 
   // ─── Obtener pieza en casilla ───
 
@@ -245,6 +265,8 @@ export function useChessGame(config: GameConfig, sounds: GameSounds, language: L
         const data = await requestAIMove(game.fen(), config.difficulty)
         if (!data.bestmove || data.bestmove === '(none)') return
 
+        setEngineError(null)
+
         const from = data.bestmove.slice(0, 2)
         const to = data.bestmove.slice(2, 4)
         const promotion = data.bestmove[4] || undefined
@@ -258,6 +280,8 @@ export function useChessGame(config: GameConfig, sounds: GameSounds, language: L
         const ev =
           data.mate !== null ? (data.mate > 0 ? 10000 : -10000) : data.evaluation
         setChances(evalToChances(ev))
+        evalFailCountRef.current = 0
+        setEvalError(null)
 
         setLastMove({ from, to })
         setFen(game.fen())
@@ -271,6 +295,7 @@ export function useChessGame(config: GameConfig, sounds: GameSounds, language: L
         }
       } catch (err) {
         console.error('Error IA:', err)
+        setEngineError(t.engineError)
       } finally {
         isThinkingRef.current = false
         setIsThinking(false)
@@ -279,7 +304,7 @@ export function useChessGame(config: GameConfig, sounds: GameSounds, language: L
 
     return () => clearTimeout(timer)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fen, gameOverInfo, isAIMode, language])
+  }, [fen, gameOverInfo, isAIMode, language, aiRetryToken, config.difficulty])
 
   // ─── Evaluación continua de la posición para probabilidades realistas ───
 
@@ -298,8 +323,13 @@ export function useChessGame(config: GameConfig, sounds: GameSounds, language: L
 
         const ev = data.mate !== null ? (data.mate > 0 ? 10000 : -10000) : data.evaluation
         setChances(evalToChances(ev))
+        evalFailCountRef.current = 0
+        setEvalError(null)
       } catch {
-        // Si falla eval puntual, mantenemos el último valor visible.
+        evalFailCountRef.current += 1
+        if (evalFailCountRef.current >= 2) {
+          setEvalError(t.evalError)
+        }
       }
     }, 160)
 
@@ -455,6 +485,12 @@ export function useChessGame(config: GameConfig, sounds: GameSounds, language: L
 
   const dismissGameOver = useCallback(() => setGameOverInfo(null), [])
 
+  const retryAIMove = useCallback(() => {
+    if (!isAIMode || gameOverInfo || isThinkingRef.current) return
+    setEngineError(null)
+    setAiRetryToken((n) => n + 1)
+  }, [isAIMode, gameOverInfo])
+
   return {
     fen,
     selectedSquare,
@@ -462,6 +498,10 @@ export function useChessGame(config: GameConfig, sounds: GameSounds, language: L
     lastMove,
     boardFlipped,
     isThinking,
+    boardReady,
+    engineError,
+    evalError,
+    retryAIMove,
     turn,
     gameOver,
     gameOverInfo,
@@ -470,6 +510,7 @@ export function useChessGame(config: GameConfig, sounds: GameSounds, language: L
     captures,
     materialDiff,
     history,
+    pgn,
     status,
     checkSquare,
     classicalCastleOptions,

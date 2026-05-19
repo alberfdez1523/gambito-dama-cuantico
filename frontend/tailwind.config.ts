@@ -30,6 +30,12 @@ export default {
         serif: ['DM Serif Display', 'Georgia', 'serif'],
         mono: ['JetBrains Mono', 'monospace'],
       },
+      fontSize: {
+        'ui-xs': 'var(--text-ui-xs)',
+        'ui-sm': 'var(--text-ui-sm)',
+        'ui-base': 'var(--text-ui-base)',
+        'ui-lg': 'var(--text-ui-lg)',
+      },
       boxShadow: {
         subtle: '0 1px 3px 0 rgba(0,0,0,0.15)',
         card: '0 4px 24px -6px rgba(0,0,0,0.25)',

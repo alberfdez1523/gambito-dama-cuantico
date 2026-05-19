@@ -268,6 +268,7 @@ export function useQuantumChess(config: GameConfig, sounds: GameSounds, language
 
   const handleDrop = useCallback((from: string, to: string) => {
     if (gameOverInfo) return
+    if (moveMode !== 'classical') return
     const allowedColor = state.turn
 
     const cellsOnFrom = board[from] || []
@@ -296,7 +297,7 @@ export function useQuantumChess(config: GameConfig, sounds: GameSounds, language
     setSelectedPiece(null)
     setLastMove({ from: record.from, to: record.to })
     refresh()
-  }, [board, engine, gameOverInfo, refresh, sounds, state.turn])
+  }, [board, engine, gameOverInfo, moveMode, refresh, sounds, state.turn])
 
   const handlePromotion = useCallback((pieceType: string) => {
     if (!promotionPending) return

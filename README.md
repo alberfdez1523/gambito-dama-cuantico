@@ -97,11 +97,11 @@ server.py
 ### Backend
 
 ```bash
-python -m venv .venv
+py -m venv .venv
 # Windows
 .venv\Scripts\activate
 pip install -r requirements.txt
-python server.py
+py server.py
 ```
 
 ### Frontend (build)

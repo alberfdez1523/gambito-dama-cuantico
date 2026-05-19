@@ -1,15 +1,15 @@
 import { useRef, useState, useCallback, useEffect } from 'react'
 
 // ─── Música ambiente (lofi) ───
-export function useAmbientMusic() {
+export function useAmbientMusic(initialVolume = 0.3) {
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const [playing, setPlaying] = useState(false)
-  const [volume, setVolumeState] = useState(0.3)
+  const [volume, setVolumeState] = useState(initialVolume)
 
   useEffect(() => {
     const audio = new Audio('/music/lofi.mp3')
     audio.loop = true
-    audio.volume = volume
+    audio.volume = initialVolume
     audioRef.current = audio
 
     return () => {
@@ -18,6 +18,10 @@ export function useAmbientMusic() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  useEffect(() => {
+    if (audioRef.current) audioRef.current.volume = volume
+  }, [volume])
 
   const toggle = useCallback(() => {
     const audio = audioRef.current
@@ -30,13 +34,9 @@ export function useAmbientMusic() {
     setPlaying(!playing)
   }, [playing])
 
-  const setVolume = useCallback(
-    (v: number) => {
-      setVolumeState(v)
-      if (audioRef.current) audioRef.current.volume = v
-    },
-    []
-  )
+  const setVolume = useCallback((v: number) => {
+    setVolumeState(v)
+  }, [])
 
   return { playing, toggle, volume, setVolume }
 }

@@ -9,4 +9,10 @@ services:
       cd frontend && npm install && npm run build && cd .. ;
       cd engine/stockfish/src && make -j2 build ARCH=x86-64
     startCommand: python server.py
+    healthCheckPath: /api/health
     autoDeploy: true
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12"
+      - key: NODE_VERSION
+        value: "20"

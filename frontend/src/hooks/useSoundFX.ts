@@ -1,8 +1,13 @@
-import { useRef, useCallback } from 'react'
+import { useRef, useCallback, useEffect } from 'react'
 
 // ─── Efectos de sonido con Web Audio API ───
-export function useSoundFX() {
+export function useSoundFX(volume = 0.8) {
   const ctxRef = useRef<AudioContext | null>(null)
+  const volumeRef = useRef(volume)
+
+  useEffect(() => {
+    volumeRef.current = volume
+  }, [volume])
 
   const getCtx = useCallback(() => {
     if (!ctxRef.current) {
@@ -17,9 +22,11 @@ export function useSoundFX() {
         const ctx = getCtx()
         const osc = ctx.createOscillator()
         const g = ctx.createGain()
+        const scaledGain = gain * volumeRef.current
+        if (scaledGain <= 0.001) return
         osc.type = type
         osc.frequency.value = freq
-        g.gain.setValueAtTime(gain, ctx.currentTime)
+        g.gain.setValueAtTime(scaledGain, ctx.currentTime)
         g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration)
         osc.connect(g).connect(ctx.destination)
         osc.start()

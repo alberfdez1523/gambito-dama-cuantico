@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
 import type { Language, QMeasurementEvent } from '../lib/types'
+import { useModalA11y } from '../hooks/useModalA11y'
 
 interface QuantumMeasurementRouletteProps {
   visible: boolean
@@ -14,6 +15,7 @@ export default function QuantumMeasurementRoulette({
 }: QuantumMeasurementRouletteProps) {
   const [spun, setSpun] = useState(false)
   const [spinDone, setSpinDone] = useState(false)
+  const reduceMotion = useReducedMotion()
 
   useEffect(() => {
     if (!visible) { setSpun(false); setSpinDone(false) }
@@ -32,7 +34,7 @@ export default function QuantumMeasurementRoulette({
   const alivePct = Math.round(probability * 100)
   const deadPct = 100 - alivePct
   const isAlive = result === 'alive'
-  const baseTurns = 1440
+  const baseTurns = reduceMotion ? 0 : 1440
   const pointerDeg = Math.min(359.9, Math.max(0, roll * 360))
   const finalWheelRotation = spun ? baseTurns - pointerDeg : 0
   const revealResult = spinDone
@@ -46,6 +48,7 @@ export default function QuantumMeasurementRoulette({
   const es = language === 'es'
   const measuredLabel = target === 'attacker' ? (es ? 'pieza atacante' : 'attacking piece') : (es ? 'pieza objetivo' : 'target piece')
   const measuredTitle = target === 'attacker' ? (es ? 'Atacante' : 'Attacker') : (es ? 'Objetivo' : 'Target')
+  const titleId = 'quantum-measurement-title'
 
   const outcomeAlive = target === 'attacker'
     ? (es ? 'La atacante existe en esa casilla y la jugada puede continuar.' : 'The attacker exists on that square and the move can continue.')
@@ -71,7 +74,10 @@ export default function QuantumMeasurementRoulette({
     }
   }, [scenario, es])
 
-  if (!visible || !measurement) return null
+  const active = visible && !!measurement
+  const { containerRef } = useModalA11y(active)
+
+  if (!active || !measurement) return null
 
   return (
     <AnimatePresence>
@@ -81,21 +87,25 @@ export default function QuantumMeasurementRoulette({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
+          role="presentation"
         >
           <motion.div
+            ref={containerRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby={titleId}
             className="w-full max-w-sm overflow-hidden rounded-lg border border-indigo-500/20 bg-surface-1 text-center"
-            initial={{ scale: 0.93, opacity: 0 }}
+            initial={reduceMotion ? false : { scale: 0.93, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
-            exit={{ scale: 0.93, opacity: 0 }}
+            exit={reduceMotion ? undefined : { scale: 0.93, opacity: 0 }}
           >
-            {/* Header */}
             <div className="border-b border-surface-4 px-5 py-4 text-left">
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-indigo-400">
                     {es ? 'Medición cuántica' : 'Quantum measurement'}
                   </p>
-                  <h3 className="mt-1 font-serif text-base text-white">{scenarioText.title}</h3>
+                  <h3 id={titleId} className="mt-1 font-serif text-base text-white">{scenarioText.title}</h3>
                   <p className="mt-1 text-xs leading-tight text-neutral-500">{scenarioText.text}</p>
                 </div>
                 <span className="rounded border border-indigo-500/20 bg-indigo-500/10 px-2 py-1 text-[10px] font-semibold text-indigo-300">
@@ -121,13 +131,12 @@ export default function QuantumMeasurementRoulette({
               </div>
             </div>
 
-            {/* Wheel */}
             <div className="px-5 py-4">
               <div className="relative mx-auto h-48 w-48">
                 <motion.div
                   className="relative h-full w-full rounded-full p-2.5"
                   animate={{ rotate: finalWheelRotation }}
-                  transition={{ duration: 1.35, ease: [0.1, 0.9, 0.2, 1] }}
+                  transition={reduceMotion ? { duration: 0 } : { duration: 1.35, ease: [0.1, 0.9, 0.2, 1] }}
                   onAnimationComplete={() => { if (spun) setSpinDone(true) }}
                 >
                   <div
@@ -154,7 +163,6 @@ export default function QuantumMeasurementRoulette({
                 </div>
               </div>
 
-              {/* Outcomes */}
               <div className="mt-4 grid grid-cols-2 gap-2 text-left text-[11px]">
                 <div className="rounded border border-emerald-500/15 bg-emerald-500/5 px-3 py-2">
                   <p className="font-semibold uppercase tracking-wider text-emerald-400">{es ? 'Si vivo' : 'If alive'}</p>
@@ -168,7 +176,6 @@ export default function QuantumMeasurementRoulette({
                 </div>
               </div>
 
-              {/* Roll info */}
               <div className="mt-3 rounded border border-surface-4 bg-surface-2 px-3 py-2 text-left text-[11px]">
                 <div className="flex items-center justify-between text-neutral-500">
                   <span>{es ? 'Tirada' : 'Roll'}</span>
@@ -182,12 +189,12 @@ export default function QuantumMeasurementRoulette({
                 </div>
               </div>
 
-              {/* Actions */}
               <div className="mt-4 flex items-center justify-center gap-2">
                 <button
+                  type="button"
                   onClick={() => { if (!spun) setSpun(true) }}
                   disabled={spun}
-                  className={`rounded px-4 py-2 text-xs font-semibold transition-colors
+                  className={`min-h-[44px] rounded px-4 py-2 text-xs font-semibold transition-colors
                     ${spun
                       ? 'cursor-not-allowed border border-surface-4 bg-surface-2 text-neutral-600'
                       : 'border border-indigo-500/30 bg-indigo-500/10 text-indigo-300 hover:bg-indigo-500/20'
@@ -196,9 +203,10 @@ export default function QuantumMeasurementRoulette({
                   {spun ? (es ? 'Resuelta' : 'Resolved') : (es ? 'Girar ruleta' : 'Spin roulette')}
                 </button>
                 <button
+                  type="button"
                   onClick={onClose}
                   disabled={!spinDone}
-                  className={`rounded px-4 py-2 text-xs font-semibold transition-colors
+                  className={`min-h-[44px] rounded px-4 py-2 text-xs font-semibold transition-colors
                     ${spinDone
                       ? 'border border-accent/30 bg-accent/10 text-accent hover:bg-accent/20'
                       : 'cursor-not-allowed border border-surface-4 bg-surface-2 text-neutral-700'

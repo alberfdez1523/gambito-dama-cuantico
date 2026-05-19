@@ -1,4 +1,5 @@
 import type { Language } from '../lib/types'
+import { ui } from '../lib/i18n'
 
 interface MusicPlayerProps {
   playing: boolean
@@ -9,12 +10,15 @@ interface MusicPlayerProps {
 }
 
 export default function MusicPlayer({ playing, volume, onToggle, onVolumeChange, language }: MusicPlayerProps) {
+  const t = ui(language)
   return (
     <div className="flex items-center gap-3">
       <button
+        type="button"
         onClick={onToggle}
-        className={`text-sm transition-colors ${playing ? 'text-accent' : 'text-neutral-600 hover:text-neutral-400'}`}
-        title={playing ? (language === 'es' ? 'Pausar' : 'Pause') : (language === 'es' ? 'Reproducir' : 'Play')}
+        className={`min-h-[44px] min-w-[44px] text-sm transition-colors ${playing ? 'text-accent' : 'text-neutral-600 hover:text-neutral-400'}`}
+        title={playing ? t.pause : t.play}
+        aria-label={playing ? t.pause : t.play}
       >
         {playing ? '⏸' : '♫'}
       </button>
