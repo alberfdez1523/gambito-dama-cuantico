@@ -8,6 +8,14 @@ __pycache__/
 frontend/node_modules/
 frontend/dist/
 
+# Secretos y entorno local (nunca subir claves reales)
+.env
+.env.*
+!.env.example
+frontend/.env
+frontend/.env.*
+!frontend/.env.example
+
 # Stockfish binaries (compiled locally)
 engine/stockfish/src/stockfish
 engine/stockfish/src/stockfish.exe

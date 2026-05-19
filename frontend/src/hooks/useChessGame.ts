@@ -96,7 +96,16 @@ export interface GameSounds {
 
 // ─── Hook principal ───
 
-export function useChessGame(config: GameConfig, sounds: GameSounds, language: Language) {
+export interface UseChessGameOptions {
+  onMoveApplied?: (fen: string, nextTurn: PieceColor, lastMove: { from: string; to: string }) => void
+}
+
+export function useChessGame(
+  config: GameConfig,
+  sounds: GameSounds,
+  language: Language,
+  options: UseChessGameOptions = {},
+) {
   const gameRef = useRef(new Chess())
   const isThinkingRef = useRef(false)
   const evalFailCountRef = useRef(0)
@@ -114,6 +123,7 @@ export function useChessGame(config: GameConfig, sounds: GameSounds, language: L
   const [promotionPending, setPromotionPending] = useState<{ from: string; to: string } | null>(null)
   const [gameOverInfo, setGameOverInfo] = useState<GameOverInfo | null>(null)
   const isAIMode = config.opponentMode === 'ai'
+  const isOnline = config.opponentMode === 'online'
   const t = ui(language)
 
   useEffect(() => {
@@ -201,8 +211,12 @@ export function useChessGame(config: GameConfig, sounds: GameSounds, language: L
       if (turn === config.playerColor) return { text: t.yourTurn, type: 'player' as const }
       return { text: t.aiTurn, type: 'ai' as const }
     }
+    if (isOnline) {
+      if (turn === config.playerColor) return { text: t.yourTurn, type: 'player' as const }
+      return { text: t.opponentTurn, type: 'ai' as const }
+    }
     return { text: t.turnColor(getColorName(turn, language)), type: 'player' as const }
-  }, [gameOverInfo, isThinking, turn, config.playerColor, isAIMode, language, t])
+  }, [gameOverInfo, isThinking, turn, config.playerColor, isAIMode, isOnline, language, t])
 
   const pgn = useMemo(() => {
     try {
@@ -236,6 +250,10 @@ export function useChessGame(config: GameConfig, sounds: GameSounds, language: L
       setSelectedSquare(null)
       setLastMove({ from, to })
       setFen(game.fen())
+
+      if (isOnline && options.onMoveApplied) {
+        options.onMoveApplied(game.fen(), game.turn() as PieceColor, { from, to })
+      }
 
       const endInfo = detectGameEnd(game, config.playerColor, isAIMode, language)
       if (endInfo) {
@@ -359,7 +377,8 @@ export function useChessGame(config: GameConfig, sounds: GameSounds, language: L
     (sq: string) => {
       const game = gameRef.current
       if (isThinkingRef.current || gameOverInfo) return
-      const allowedColor = isAIMode ? config.playerColor : (game.turn() as PieceColor)
+      if (isOnline && game.turn() !== config.playerColor) return
+      const allowedColor = isAIMode || isOnline ? config.playerColor : (game.turn() as PieceColor)
       if (game.turn() !== allowedColor) return
 
       const clicked = game.get(sq)
@@ -388,14 +407,15 @@ export function useChessGame(config: GameConfig, sounds: GameSounds, language: L
         setSelectedSquare(sq)
       }
     },
-    [selectedSquare, config.playerColor, gameOverInfo, doMove, isAIMode]
+    [selectedSquare, config.playerColor, gameOverInfo, doMove, isAIMode, isOnline]
   )
 
   const handleDrop = useCallback(
     (from: string, to: string) => {
       const game = gameRef.current
       if (isThinkingRef.current || gameOverInfo) return
-      const allowedColor = isAIMode ? config.playerColor : (game.turn() as PieceColor)
+      if (isOnline && game.turn() !== config.playerColor) return
+      const allowedColor = isAIMode || isOnline ? config.playerColor : (game.turn() as PieceColor)
       if (game.turn() !== allowedColor) return
 
       const piece = game.get(from)
@@ -415,8 +435,17 @@ export function useChessGame(config: GameConfig, sounds: GameSounds, language: L
         doMove(from, to)
       }
     },
-    [config.playerColor, gameOverInfo, doMove, isAIMode]
+    [config.playerColor, gameOverInfo, doMove, isAIMode, isOnline]
   )
+
+  const loadFen = useCallback((fen: string, lastMove?: { from: string; to: string } | null) => {
+    const game = new Chess(fen)
+    gameRef.current = game
+    setSelectedSquare(null)
+    setLastMove(lastMove ?? null)
+    setFen(game.fen())
+    setGameOverInfo(null)
+  }, [])
 
   const handlePromotion = useCallback(
     (piece: string) => {
@@ -430,15 +459,16 @@ export function useChessGame(config: GameConfig, sounds: GameSounds, language: L
   const doClassicalCastle = useCallback((side: 'k' | 'q') => {
     const game = gameRef.current
     if (isThinkingRef.current || gameOverInfo) return
+    if (isOnline && game.turn() !== config.playerColor) return
 
-    const allowedColor = isAIMode ? config.playerColor : (game.turn() as PieceColor)
+    const allowedColor = isAIMode || isOnline ? config.playerColor : (game.turn() as PieceColor)
     if (game.turn() !== allowedColor) return
 
     const rank = allowedColor === 'w' ? '1' : '8'
     const from = `e${rank}`
     const to = side === 'k' ? `g${rank}` : `c${rank}`
     doMove(from, to)
-  }, [config.playerColor, doMove, gameOverInfo, isAIMode])
+  }, [config.playerColor, doMove, gameOverInfo, isAIMode, isOnline])
 
   function undoMove() {
     const game = gameRef.current
@@ -525,8 +555,10 @@ export function useChessGame(config: GameConfig, sounds: GameSounds, language: L
     handleTimedOut,
     dismissGameOver,
     playerColor: config.playerColor,
-    controlColor: isAIMode ? config.playerColor : turn,
+    controlColor: isAIMode || isOnline ? config.playerColor : turn,
     isAIMode,
+    isOnline,
+    loadFen,
     difficulty: config.difficulty,
   }
 }

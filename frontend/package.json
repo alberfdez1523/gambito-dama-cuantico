@@ -10,6 +10,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.106.0",
     "chess.js": "^0.12.1",
     "framer-motion": "^11.15.0",
     "react": "^18.3.1",

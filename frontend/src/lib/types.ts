@@ -5,8 +5,16 @@ export type PieceType = 'p' | 'n' | 'b' | 'r' | 'q' | 'k'
 export type Difficulty = 'beginner' | 'easy' | 'medium' | 'hard' | 'master'
 export type PlayerColorChoice = 'w' | 'b' | 'random'
 export type GameMode = 'classic' | 'quantum'
-export type OpponentMode = 'ai' | 'local'
+export type OpponentMode = 'ai' | 'local' | 'online'
 export type Language = 'es' | 'en'
+
+export interface OnlineMeta {
+  roomId: string
+  code: string
+  myColor: PieceColor
+  isHost: boolean
+  userId: string
+}
 
 export interface GameConfig {
   playerColor: PieceColor
@@ -15,6 +23,8 @@ export interface GameConfig {
   useTimer: boolean
   timerMinutes: number
   gameMode: GameMode
+  /** Presente cuando opponentMode === 'online' */
+  online?: OnlineMeta
 }
 
 export interface DifficultyMeta {

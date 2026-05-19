@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react'
+import { useCallback, useEffect, useMemo, useRef } from 'react'
 import { motion, useReducedMotion } from 'framer-motion'
 import Board from './Board'
 import BoardSkeleton from './BoardSkeleton'
@@ -9,7 +9,9 @@ import ActionButtons from './ActionButtons'
 import MusicPlayer from './MusicPlayer'
 import PromotionModal from './PromotionModal'
 import GameOverModal from './GameOverModal'
+import OnlineSessionEndedModal from './OnlineSessionEndedModal'
 import { useChessGame } from '../hooks/useChessGame'
+import { useOnlineGameSync } from '../hooks/useOnlineGameSync'
 import { useSoundFX } from '../hooks/useSoundFX'
 import { useAmbientMusic } from '../hooks/useAmbientMusic'
 import { useTimer } from '../hooks/useTimer'
@@ -20,7 +22,7 @@ import type { GameConfig, Language } from '../lib/types'
 
 interface GameScreenProps {
   config: GameConfig
-  onNewGame: () => void
+  onNewGame: () => void | Promise<void>
   language: Language
   settings: AppSettings
   onOpenSettings: () => void
@@ -37,9 +39,41 @@ export default function GameScreen({
 }: GameScreenProps) {
   const sounds = useSoundFX(settings.sfxVolume)
   const music = useAmbientMusic(settings.musicVolume)
-  const game = useChessGame(config, sounds, language)
+  const onlineSync = useOnlineGameSync({
+    config,
+    enabled: config.opponentMode === 'online',
+  })
   const t = ui(language)
   const reduceMotion = useReducedMotion()
+
+  const leavingRef = useRef(false)
+
+  const handleLeaveToMenu = useCallback(async () => {
+    if (leavingRef.current) return
+    leavingRef.current = true
+    try {
+      await onNewGame()
+    } finally {
+      leavingRef.current = false
+    }
+  }, [onNewGame])
+
+  useEffect(() => {
+    if (!onlineSync.opponentLeft) return
+    const id = window.setTimeout(() => handleLeaveToMenu(), 2500)
+    return () => window.clearTimeout(id)
+  }, [onlineSync.opponentLeft, handleLeaveToMenu])
+
+  const onMoveApplied = useCallback(
+    (fen: string, nextTurn: import('../lib/types').PieceColor, lastMove: { from: string; to: string }) => {
+      if (config.opponentMode === 'online') {
+        void onlineSync.pushClassicState(fen, nextTurn, lastMove)
+      }
+    },
+    [config.opponentMode, onlineSync],
+  )
+
+  const game = useChessGame(config, sounds, language, { onMoveApplied })
 
   const timer = useTimer({
     enabled: config.useTimer,
@@ -63,45 +97,75 @@ export default function GameScreen({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [settings.musicVolume])
 
+  useEffect(() => {
+    if (!onlineSync.shouldApplyRemote || !onlineSync.remoteState) return
+    if (onlineSync.remoteState.type !== 'classic') return
+    if (!onlineSync.validateClassicFen(onlineSync.remoteState.fen)) return
+
+    onlineSync.beginRemoteApply()
+    game.loadFen(onlineSync.remoteState.fen, onlineSync.remoteState.lastMove ?? null)
+    onlineSync.markRemoteApplied(onlineSync.remoteVersion)
+    onlineSync.endRemoteApply()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [onlineSync.remoteVersion])
+
+  useEffect(() => {
+    if (game.gameOverInfo && config.opponentMode === 'online') {
+      void onlineSync.finishGame()
+    }
+  }, [game.gameOverInfo, config.opponentMode, onlineSync])
+
   const diffMeta = DIFFICULTIES.find((d) => d.key === config.difficulty)
   const isAIMode = config.opponentMode === 'ai'
-  const aiColor = config.playerColor === 'w' ? 'b' : 'w'
-  const topColor = game.boardFlipped ? config.playerColor : aiColor
-  const bottomColor = game.boardFlipped ? aiColor : config.playerColor
+  const isOnline = game.isOnline
+  const opponentColor = config.playerColor === 'w' ? 'b' : 'w'
+  const aiColor = opponentColor
+  const topColor = game.boardFlipped ? config.playerColor : opponentColor
+  const bottomColor = game.boardFlipped ? opponentColor : config.playerColor
+
+  const labelForColor = (c: typeof topColor) => {
+    if (isAIMode) return c === config.playerColor ? t.you : 'Stockfish'
+    if (isOnline) return c === config.playerColor ? t.you : (language === 'es' ? 'Rival' : 'Opponent')
+    return getPlayerLabel(c, language)
+  }
 
   const topBar = useMemo(() => {
     const isAI = isAIMode && topColor !== config.playerColor
-    const localLabel = getPlayerLabel(topColor, language)
     return {
-      label: isAIMode ? (isAI ? 'Stockfish' : t.you) : localLabel,
+      label: labelForColor(topColor),
       elo: isAI ? diffMeta?.elo || '' : '',
       color: topColor,
-      captures: isAI ? game.captures.ai : game.captures.player,
-      materialDiff: isAI ? -game.materialDiff : game.materialDiff,
+      captures:
+        topColor === config.playerColor ? game.captures.player : game.captures.ai,
+      materialDiff:
+        topColor === config.playerColor ? game.materialDiff : -game.materialDiff,
       isActive: game.turn === topColor && !game.gameOver,
       time: config.useTimer ? (topColor === 'w' ? timer.whiteTime : timer.blackTime) : null,
       isLow: config.useTimer ? (topColor === 'w' ? timer.whiteTime : timer.blackTime) < 60 : false,
     }
-  }, [topColor, config, diffMeta, game, timer, isAIMode, language, t.you])
+  }, [topColor, config, diffMeta, game, timer, isAIMode, isOnline, language, t.you])
 
   const bottomBar = useMemo(() => {
     const isAI = isAIMode && bottomColor !== config.playerColor
-    const localLabel = getPlayerLabel(bottomColor, language)
     return {
-      label: isAIMode ? (isAI ? 'Stockfish' : t.you) : localLabel,
+      label: labelForColor(bottomColor),
       elo: isAI ? diffMeta?.elo || '' : '',
       color: bottomColor,
-      captures: isAI ? game.captures.ai : game.captures.player,
-      materialDiff: isAI ? -game.materialDiff : game.materialDiff,
+      captures:
+        bottomColor === config.playerColor ? game.captures.player : game.captures.ai,
+      materialDiff:
+        bottomColor === config.playerColor ? game.materialDiff : -game.materialDiff,
       isActive: game.turn === bottomColor && !game.gameOver,
       time: config.useTimer ? (bottomColor === 'w' ? timer.whiteTime : timer.blackTime) : null,
       isLow: config.useTimer ? (bottomColor === 'w' ? timer.whiteTime : timer.blackTime) < 60 : false,
     }
-  }, [bottomColor, config, diffMeta, game, timer, isAIMode, language, t.you])
+  }, [bottomColor, config, diffMeta, game, timer, isAIMode, isOnline, language, t.you])
 
   const modeBadge = isAIMode
     ? t.classicModeBadge(diffMeta ? getDifficultyLabel(config.difficulty, language) : '')
-    : t.classic2P
+    : isOnline
+      ? `${t.onlineBadge}${config.online?.code ? ` · ${config.online.code}` : ''}`
+      : t.classic2P
 
   const boardMotion = reduceMotion
     ? { initial: false, animate: { opacity: 1 }, transition: { duration: 0 } }
@@ -128,7 +192,7 @@ export default function GameScreen({
           </button>
           <button
             type="button"
-            onClick={onNewGame}
+            onClick={handleLeaveToMenu}
             className="min-h-[44px] rounded px-3 py-1.5 text-ui-sm font-medium text-neutral-500 transition-colors hover:bg-surface-2 hover:text-white"
           >
             {t.menu}
@@ -234,6 +298,7 @@ export default function GameScreen({
               canUndo={game.history.length >= 2 && !game.isThinking}
               gameOver={game.gameOver}
               language={language}
+              showUndo={!isOnline}
             />
           </div>
           <div className="rule" />
@@ -282,8 +347,13 @@ export default function GameScreen({
       />
       <GameOverModal
         info={game.gameOverInfo}
-        onNewGame={onNewGame}
+        onNewGame={handleLeaveToMenu}
         onDismiss={game.dismissGameOver}
+        language={language}
+      />
+      <OnlineSessionEndedModal
+        visible={onlineSync.opponentLeft}
+        onMenu={handleLeaveToMenu}
         language={language}
       />
     </div>

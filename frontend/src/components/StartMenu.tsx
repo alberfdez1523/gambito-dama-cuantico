@@ -7,12 +7,25 @@ import type { GameConfig, GameMode, OpponentMode, PieceColor, Difficulty, Langua
 
 interface StartMenuProps {
   onPlay: (config: GameConfig) => void
+  onOpenOnlineLobby: (prefs: {
+    gameMode: GameMode
+    color: PlayerColorChoice
+    useTimer: boolean
+    timerMinutes: number
+    difficulty: Difficulty
+  }) => void
   onRules: () => void
   language: Language
   onOpenSettings: () => void
 }
 
-export default function StartMenu({ onPlay, onRules, language, onOpenSettings }: StartMenuProps) {
+export default function StartMenu({
+  onPlay,
+  onOpenOnlineLobby,
+  onRules,
+  language,
+  onOpenSettings,
+}: StartMenuProps) {
   const [color, setColor] = useState<PlayerColorChoice>('w')
   const [difficulty, setDifficulty] = useState<Difficulty>('medium')
   const [opponentMode, setOpponentMode] = useState<OpponentMode>('ai')
@@ -23,7 +36,8 @@ export default function StartMenu({ onPlay, onRules, language, onOpenSettings }:
   const [checking, setChecking] = useState(true)
 
   const requiresEngine = gameMode === 'classic' && opponentMode === 'ai'
-  const canPlay = requiresEngine ? serverReady : true
+  const isOnlineMode = opponentMode === 'online'
+  const canPlay = isOnlineMode ? true : requiresEngine ? serverReady : true
   const isQuantum = gameMode === 'quantum'
 
   const t = language === 'es'
@@ -40,7 +54,10 @@ export default function StartMenu({ onPlay, onRules, language, onOpenSettings }:
         opponent: 'Oponente',
         vsAi: 'Vs IA',
         twoPlayers: '2 jugadores',
-        quantumInfo: 'El modo cuántico es solo para 2 jugadores en el mismo tablero.',
+        online: 'En línea',
+        playOnline: 'Multijugador en línea',
+        playLocal: 'Mismo dispositivo',
+        quantumInfo: 'Modo cuántico: 2 jugadores en el mismo tablero o en línea con código de sala.',
         difficulty: 'Dificultad',
         diffUnused: 'En 2 jugadores la dificultad no se usa.',
         clock: 'Reloj',
@@ -67,7 +84,10 @@ export default function StartMenu({ onPlay, onRules, language, onOpenSettings }:
         opponent: 'Opponent',
         vsAi: 'Vs AI',
         twoPlayers: '2 players',
-        quantumInfo: 'Quantum mode is only for 2 players on the same board.',
+        online: 'Online',
+        playOnline: 'Online multiplayer',
+        playLocal: 'Same device',
+        quantumInfo: 'Quantum mode: 2 players on one device or online with a room code.',
         difficulty: 'Difficulty',
         diffUnused: 'Difficulty is not used in 2-player mode.',
         clock: 'Clock',
@@ -97,13 +117,38 @@ export default function StartMenu({ onPlay, onRules, language, onOpenSettings }:
     return () => { cancelled = true }
   }, [])
 
+  const openOnlineLobby = useCallback(() => {
+    onOpenOnlineLobby({
+      gameMode,
+      color,
+      useTimer,
+      timerMinutes,
+      difficulty,
+    })
+  }, [color, difficulty, gameMode, onOpenOnlineLobby, timerMinutes, useTimer])
+
   const handlePlay = useCallback(() => {
     if (!canPlay) return
+    if (isOnlineMode) {
+      openOnlineLobby()
+      return
+    }
     const playerColor: PieceColor =
       color === 'random' ? (Math.random() < 0.5 ? 'w' : 'b') : color
     const mode = gameMode === 'quantum' ? 'local' : opponentMode
     onPlay({ playerColor, difficulty, opponentMode: mode, useTimer, timerMinutes, gameMode })
-  }, [color, difficulty, opponentMode, useTimer, timerMinutes, gameMode, canPlay, onPlay])
+  }, [
+    color,
+    difficulty,
+    opponentMode,
+    useTimer,
+    timerMinutes,
+    gameMode,
+    canPlay,
+    onPlay,
+    isOnlineMode,
+    openOnlineLobby,
+  ])
 
   const stagger = {
     hidden: { opacity: 0, y: 12 },
@@ -226,6 +271,7 @@ export default function StartMenu({ onPlay, onRules, language, onOpenSettings }:
                   {([
                     { value: 'ai' as OpponentMode, label: t.vsAi },
                     { value: 'local' as OpponentMode, label: t.twoPlayers },
+                    { value: 'online' as OpponentMode, label: t.online },
                   ] as const).map((opt, i) => (
                     <button
                       key={opt.value}
@@ -243,11 +289,17 @@ export default function StartMenu({ onPlay, onRules, language, onOpenSettings }:
                 </div>
               </motion.div>
             ) : (
-              <motion.div
-                className="mb-7 rounded border border-indigo-500/20 bg-indigo-500/5 px-4 py-3 text-ui-sm text-indigo-300"
-                custom={2} variants={stagger} initial="hidden" animate="show"
-              >
-                ⚛ {t.quantumInfo}
+              <motion.div className="mb-7 space-y-3" custom={2} variants={stagger} initial="hidden" animate="show">
+                <p className="rounded border border-indigo-500/20 bg-indigo-500/5 px-4 py-3 text-ui-sm text-indigo-300">
+                  ⚛ {t.quantumInfo}
+                </p>
+                <button
+                  type="button"
+                  onClick={openOnlineLobby}
+                  className="w-full rounded border border-indigo-400/40 py-3 text-ui-sm font-semibold text-indigo-300 hover:bg-indigo-500/10"
+                >
+                  🌐 {t.playOnline}
+                </button>
               </motion.div>
             )}
 
@@ -352,8 +404,14 @@ export default function StartMenu({ onPlay, onRules, language, onOpenSettings }:
                   }`}
               >
                 {canPlay
-                  ? isQuantum ? `⚛  ${t.playQuantum}` : `▸  ${t.playClassic}`
-                  : checking ? t.connecting : t.unavailable}
+                  ? isOnlineMode
+                    ? `🌐  ${t.playOnline}`
+                    : isQuantum
+                      ? `⚛  ${t.playLocal}`
+                      : `▸  ${t.playClassic}`
+                  : checking
+                    ? t.connecting
+                    : t.unavailable}
               </button>
             </motion.div>
 

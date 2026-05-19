@@ -16,3 +16,8 @@ services:
         value: "3.12"
       - key: NODE_VERSION
         value: "20"
+      # Obligatorias para multijugador online (configúralas en el dashboard de Render)
+      - key: VITE_SUPABASE_URL
+        sync: false
+      - key: VITE_SUPABASE_ANON_KEY
+        sync: false

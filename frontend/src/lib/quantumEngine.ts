@@ -601,6 +601,16 @@ export class QuantumChessEngine {
     return this.state.gameOver
   }
 
+  /** Snapshot para sincronización multijugador */
+  exportState(): QState {
+    return structuredClone(this.state)
+  }
+
+  /** Restaura estado remoto (multijugador) */
+  loadState(next: QState): void {
+    this.state = structuredClone(next)
+  }
+
   // ═══════════════════════════════════════════════════════════════════
   //  Métodos privados
   // ═══════════════════════════════════════════════════════════════════

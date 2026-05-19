@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { motion, useReducedMotion } from 'framer-motion'
 import QuantumBoard from './QuantumBoard'
 import BoardSkeleton from './BoardSkeleton'
@@ -9,8 +9,10 @@ import ActionButtons from './ActionButtons'
 import MusicPlayer from './MusicPlayer'
 import PromotionModal from './PromotionModal'
 import GameOverModal from './GameOverModal'
+import OnlineSessionEndedModal from './OnlineSessionEndedModal'
 import QuantumMeasurementRoulette from './QuantumMeasurementRoulette'
 import { useQuantumChess } from '../hooks/useQuantumChess'
+import { useOnlineGameSync } from '../hooks/useOnlineGameSync'
 import { useSoundFX } from '../hooks/useSoundFX'
 import { useAmbientMusic } from '../hooks/useAmbientMusic'
 import { useTimer } from '../hooks/useTimer'
@@ -20,7 +22,7 @@ import type { GameConfig, Language, PieceColor, QMoveMode } from '../lib/types'
 
 interface QuantumGameScreenProps {
   config: GameConfig
-  onNewGame: () => void
+  onNewGame: () => void | Promise<void>
   language: Language
   settings: AppSettings
   onOpenSettings: () => void
@@ -37,8 +39,41 @@ export default function QuantumGameScreen({
 }: QuantumGameScreenProps) {
   const sounds = useSoundFX(settings.sfxVolume)
   const music = useAmbientMusic(settings.musicVolume)
-  const game = useQuantumChess(config, sounds, language)
+  const onlineSync = useOnlineGameSync({
+    config,
+    enabled: config.opponentMode === 'online',
+  })
   const t = ui(language)
+
+  const leavingRef = useRef(false)
+
+  const handleLeaveToMenu = useCallback(async () => {
+    if (leavingRef.current) return
+    leavingRef.current = true
+    try {
+      await onNewGame()
+    } finally {
+      leavingRef.current = false
+    }
+  }, [onNewGame])
+
+  useEffect(() => {
+    if (!onlineSync.opponentLeft) return
+    const id = window.setTimeout(() => handleLeaveToMenu(), 2500)
+    return () => window.clearTimeout(id)
+  }, [onlineSync.opponentLeft, handleLeaveToMenu])
+
+  const onStateChange = useCallback(
+    (engine: import('../lib/quantumEngine').QuantumChessEngine) => {
+      if (config.opponentMode === 'online') {
+        void onlineSync.pushQuantumState(engine.exportState(), engine.state.turn)
+      }
+    },
+    [config.opponentMode, onlineSync],
+  )
+
+  const game = useQuantumChess(config, sounds, language, { onStateChange })
+  const isOnline = game.isOnline
   const reduceMotion = useReducedMotion()
   const [boardReady, setBoardReady] = useState(false)
   const [mobileModesOpen, setMobileModesOpen] = useState(false)
@@ -70,8 +105,31 @@ export default function QuantumGameScreen({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [timer.timedOut])
 
-  const topColor: PieceColor = game.boardFlipped ? 'w' : 'b'
-  const bottomColor: PieceColor = game.boardFlipped ? 'b' : 'w'
+  useEffect(() => {
+    if (!onlineSync.shouldApplyRemote || !onlineSync.remoteState) return
+    if (onlineSync.remoteState.type !== 'quantum') return
+
+    onlineSync.beginRemoteApply()
+    game.loadQuantumState(onlineSync.remoteState.qstate)
+    onlineSync.markRemoteApplied(onlineSync.remoteVersion)
+    onlineSync.endRemoteApply()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [onlineSync.remoteVersion])
+
+  useEffect(() => {
+    if (game.gameOverInfo && config.opponentMode === 'online') {
+      void onlineSync.finishGame()
+    }
+  }, [game.gameOverInfo, config.opponentMode, onlineSync])
+
+  const opponentColor: PieceColor = config.playerColor === 'w' ? 'b' : 'w'
+  const topColor: PieceColor = game.boardFlipped ? config.playerColor : opponentColor
+  const bottomColor: PieceColor = game.boardFlipped ? opponentColor : config.playerColor
+
+  const labelForColor = (c: PieceColor) => {
+    if (isOnline) return c === config.playerColor ? t.you : (language === 'es' ? 'Rival' : 'Opponent')
+    return getPlayerLabel(c, language)
+  }
 
   const classicHistory = useMemo(() => {
     return game.history.map((m) => ({
@@ -88,7 +146,7 @@ export default function QuantumGameScreen({
   }, [game.history])
 
   const topBar = useMemo(() => ({
-    label: getPlayerLabel(topColor, language),
+    label: labelForColor(topColor),
     elo: '',
     color: topColor,
     isActive: game.turn === topColor && !game.gameOver,
@@ -99,7 +157,7 @@ export default function QuantumGameScreen({
   }), [topColor, config, game, timer, language])
 
   const bottomBar = useMemo(() => ({
-    label: getPlayerLabel(bottomColor, language),
+    label: labelForColor(bottomColor),
     elo: '',
     color: bottomColor,
     isActive: game.turn === bottomColor && !game.gameOver,
@@ -158,7 +216,9 @@ export default function QuantumGameScreen({
           <span className="font-serif text-lg text-indigo-400">⚛</span>
           <span className="hidden font-serif text-sm text-white sm:inline">GdD</span>
           <span className="text-ui-xs font-medium uppercase tracking-wider text-neutral-500">
-            {t.quantumBadge}
+            {isOnline
+              ? `${t.onlineBadge}${config.online?.code ? ` · ${config.online.code}` : ''}`
+              : t.quantumBadge}
           </span>
         </div>
         <div className="flex items-center gap-1">
@@ -172,7 +232,7 @@ export default function QuantumGameScreen({
           </button>
           <button
             type="button"
-            onClick={onNewGame}
+            onClick={handleLeaveToMenu}
             className="min-h-[44px] rounded px-3 py-1.5 text-ui-sm font-medium text-neutral-500 transition-colors hover:bg-surface-2 hover:text-white"
           >
             {t.menu}
@@ -404,8 +464,13 @@ export default function QuantumGameScreen({
       />
       <GameOverModal
         info={game.gameOverInfo}
-        onNewGame={onNewGame}
+        onNewGame={handleLeaveToMenu}
         onDismiss={game.dismissGameOver}
+        language={language}
+      />
+      <OnlineSessionEndedModal
+        visible={onlineSync.opponentLeft}
+        onMenu={handleLeaveToMenu}
         language={language}
       />
       <QuantumMeasurementRoulette

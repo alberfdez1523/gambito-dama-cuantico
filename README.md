@@ -116,18 +116,6 @@ La app se sirve en `http://localhost:8000` desde FastAPI usando `frontend/dist`.
 
 Nota: el frontend legado de la raíz fue eliminado. Si `frontend/dist` no existe, compílalo antes de arrancar el backend o usa `npm run dev` dentro de `frontend/`.
 
-## API disponible
-
-- `GET /api/health`
-- `POST /api/move`
-- `POST /api/eval`
-- `POST /api/quantum/move` (mantenido para analisis multiverso, aunque el modo cuantico actual esta orientado a 2 jugadores)
-
-## Nombre del proyecto
-
-- Nombre publico: `Gambito de Dama Cuantico`
-- Servicio Render sugerido: `gambito-dama-cuantico`
-
 ## Notas de uso
 
 - En modo clasico 2 jugadores y en modo cuantico no hace falta motor IA para jugar.

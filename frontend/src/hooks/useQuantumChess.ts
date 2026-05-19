@@ -50,7 +50,16 @@ function qGameOverToClassic(qgo: QGameOver, playerColor: PieceColor, language: L
     : { title: language === 'es' ? 'Derrota' : 'Defeat', message: reason, result: 'lose' }
 }
 
-export function useQuantumChess(config: GameConfig, sounds: GameSounds, language: Language) {
+export interface UseQuantumChessOptions {
+  onStateChange?: (engine: QuantumChessEngine) => void
+}
+
+export function useQuantumChess(
+  config: GameConfig,
+  sounds: GameSounds,
+  language: Language,
+  options: UseQuantumChessOptions = {},
+) {
   const engineRef = useRef(new QuantumChessEngine())
 
   const [boardVersion, setBoardVersion] = useState(0)
@@ -65,6 +74,7 @@ export function useQuantumChess(config: GameConfig, sounds: GameSounds, language
     pieceId: string; from: string; to: string
   } | null>(null)
 
+  const isOnline = config.opponentMode === 'online'
   const engine = engineRef.current
   const state = engine.state
 
@@ -167,8 +177,14 @@ export function useQuantumChess(config: GameConfig, sounds: GameSounds, language
 
   const status = useMemo(() => {
     if (gameOverInfo) return { text: translateGameOverInfo(gameOverInfo, language).title, type: 'over' as const }
+    if (isOnline) {
+      if (turn === config.playerColor) {
+        return { text: language === 'es' ? 'Tu turno' : 'Your turn', type: 'player' as const }
+      }
+      return { text: language === 'es' ? 'Turno del rival' : "Opponent's turn", type: 'ai' as const }
+    }
     return { text: language === 'es' ? `Turno: ${getColorName(turn, language)}` : `${getColorName(turn, language)} to move`, type: 'player' as const }
-  }, [gameOverInfo, turn, language])
+  }, [gameOverInfo, turn, language, isOnline, config.playerColor])
 
   const refresh = useCallback(() => {
     setBoardVersion(v => v + 1)
@@ -177,10 +193,20 @@ export function useQuantumChess(config: GameConfig, sounds: GameSounds, language
       sounds.playGameEnd()
       setGameOverInfo(qGameOverToClassic(qgo, config.playerColor, language))
     }
-  }, [engine, sounds, config.playerColor, gameOverInfo, language])
+    options.onStateChange?.(engine)
+  }, [engine, sounds, config.playerColor, gameOverInfo, language, options])
+
+  const loadQuantumState = useCallback((qstate: import('../lib/types').QState) => {
+    engine.loadState(qstate)
+    setSelectedPiece(null)
+    setFirstQuantumTarget(null)
+    setMoveMode('classical')
+    setBoardVersion(v => v + 1)
+  }, [engine])
 
   const handleSquareClick = useCallback((sq: string) => {
     if (gameOverInfo) return
+    if (isOnline && state.turn !== config.playerColor) return
     const allowedColor = state.turn
 
     const cellsOnSquare = board[sq] || []
@@ -263,11 +289,12 @@ export function useQuantumChess(config: GameConfig, sounds: GameSounds, language
     }
   }, [
     board, engine, firstQuantumTarget, gameOverInfo,
-    legalTargets, moveMode, refresh, selectedPiece, sounds, state.turn,
+    legalTargets, moveMode, refresh, selectedPiece, sounds, state.turn, isOnline, config.playerColor,
   ])
 
   const handleDrop = useCallback((from: string, to: string) => {
     if (gameOverInfo) return
+    if (isOnline && state.turn !== config.playerColor) return
     if (moveMode !== 'classical') return
     const allowedColor = state.turn
 
@@ -297,7 +324,7 @@ export function useQuantumChess(config: GameConfig, sounds: GameSounds, language
     setSelectedPiece(null)
     setLastMove({ from: record.from, to: record.to })
     refresh()
-  }, [board, engine, gameOverInfo, moveMode, refresh, sounds, state.turn])
+  }, [board, engine, gameOverInfo, moveMode, refresh, sounds, state.turn, isOnline, config.playerColor])
 
   const handlePromotion = useCallback((pieceType: string) => {
     if (!promotionPending) return
@@ -316,6 +343,7 @@ export function useQuantumChess(config: GameConfig, sounds: GameSounds, language
 
   const doQuantumCastle = useCallback((side: 'k' | 'q') => {
     if (gameOverInfo) return
+    if (isOnline && state.turn !== config.playerColor) return
     const allowedColor = state.turn
 
     engine.doQuantumCastle(allowedColor, side)
@@ -323,10 +351,11 @@ export function useQuantumChess(config: GameConfig, sounds: GameSounds, language
     setSelectedPiece(null)
     setLastMove(null)
     refresh()
-  }, [engine, gameOverInfo, refresh, sounds, state.turn])
+  }, [engine, gameOverInfo, refresh, sounds, state.turn, isOnline, config.playerColor])
 
   const doClassicalCastle = useCallback((side: 'k' | 'q') => {
     if (gameOverInfo) return
+    if (isOnline && state.turn !== config.playerColor) return
 
     const allowedColor = state.turn
     const rank = allowedColor === 'w' ? '1' : '8'
@@ -408,8 +437,10 @@ export function useQuantumChess(config: GameConfig, sounds: GameSounds, language
     dismissGameOver,
     dismissMeasurement,
     playerColor: config.playerColor,
-    controlColor: turn,
+    controlColor: isOnline ? config.playerColor : turn,
     isAIMode: false,
+    isOnline,
+    loadQuantumState,
     difficulty: config.difficulty,
   }
 }

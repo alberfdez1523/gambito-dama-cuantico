@@ -1,13 +1,15 @@
-import { useState, useCallback, useEffect, lazy, Suspense } from 'react'
+import { useState, useCallback, useEffect, useRef, lazy, Suspense } from 'react'
 import { flushSync } from 'react-dom'
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import StartMenu from './components/StartMenu'
+import OnlineLobby from './components/OnlineLobby'
+import { abandonOnlineRoom, parseRoomCodeFromUrl } from './lib/onlineRoom'
 import GameScreen from './components/GameScreen'
 import QuantumGameScreen from './components/QuantumGameScreen'
 import SettingsPanel from './components/SettingsPanel'
 import BoardSkeleton from './components/BoardSkeleton'
 const RulesScreen = lazy(() => import('./components/RulesScreen'))
-import type { GameConfig } from './lib/types'
+import type { GameConfig, PlayerColorChoice } from './lib/types'
 import { loadSettings, saveSettings, type AppSettings } from './lib/settings'
 import {
   applyThemeToDom,
@@ -26,8 +28,18 @@ function RulesLoadingFallback({ language }: { language: AppSettings['language'] 
 }
 
 export default function App() {
-  const [screen, setScreen] = useState<'menu' | 'game' | 'rules'>('menu')
+  const [screen, setScreen] = useState<'menu' | 'lobby' | 'game' | 'rules'>('menu')
+  const [lobbyPrefs, setLobbyPrefs] = useState<{
+    gameMode: GameConfig['gameMode']
+    color: PlayerColorChoice
+    useTimer: boolean
+    timerMinutes: number
+    difficulty: GameConfig['difficulty']
+  } | null>(null)
   const [gameConfig, setGameConfig] = useState<GameConfig | null>(null)
+  const gameConfigRef = useRef<GameConfig | null>(null)
+  gameConfigRef.current = gameConfig
+  const lobbyRoomIdRef = useRef<string | null>(null)
   const [settings, setSettings] = useState<AppSettings>(() => loadSettings())
   const [settingsOpen, setSettingsOpen] = useState(false)
   const reduceMotion = useReducedMotion()
@@ -71,13 +83,46 @@ export default function App() {
   )
 
   const handlePlay = useCallback((config: GameConfig) => {
+    if (config.online?.roomId) {
+      lobbyRoomIdRef.current = config.online.roomId
+    }
     setGameConfig(config)
     setScreen('game')
   }, [])
 
-  const handleNewGame = useCallback(() => {
+  const handleOpenOnlineLobby = useCallback(
+    (prefs: {
+      gameMode: GameConfig['gameMode']
+      color: PlayerColorChoice
+      useTimer: boolean
+      timerMinutes: number
+      difficulty: GameConfig['difficulty']
+    }) => {
+      setLobbyPrefs(prefs)
+      setScreen('lobby')
+    },
+    [],
+  )
+
+  const handleNewGame = useCallback(async () => {
+    const cfg = gameConfigRef.current
+    const roomId = cfg?.online?.roomId ?? lobbyRoomIdRef.current
+    if (roomId) {
+      try {
+        await abandonOnlineRoom(roomId)
+      } catch (e) {
+        console.error('[online] abandon on menu failed:', e)
+      }
+      lobbyRoomIdRef.current = null
+    }
     setGameConfig(null)
+    setLobbyPrefs(null)
     setScreen('menu')
+    if (typeof window !== 'undefined' && window.location.search.includes('room=')) {
+      const url = new URL(window.location.href)
+      url.searchParams.delete('room')
+      window.history.replaceState({}, '', url.pathname + url.hash)
+    }
   }, [])
 
   const transition = reduceMotion
@@ -105,9 +150,33 @@ export default function App() {
           >
             <StartMenu
               onPlay={handlePlay}
+              onOpenOnlineLobby={handleOpenOnlineLobby}
               onRules={() => setScreen('rules')}
               language={language}
               onOpenSettings={() => setSettingsOpen(true)}
+            />
+          </motion.div>
+        ) : screen === 'lobby' && lobbyPrefs ? (
+          <motion.div
+            key="lobby"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={transition}
+          >
+            <OnlineLobby
+              language={language}
+              initialGameMode={lobbyPrefs.gameMode}
+              initialColor={lobbyPrefs.color}
+              useTimer={lobbyPrefs.useTimer}
+              timerMinutes={lobbyPrefs.timerMinutes}
+              difficulty={lobbyPrefs.difficulty}
+              initialJoinCode={parseRoomCodeFromUrl()}
+              onBack={() => void handleNewGame()}
+              onRoomActive={(roomId) => {
+                lobbyRoomIdRef.current = roomId
+              }}
+              onStart={handlePlay}
             />
           </motion.div>
         ) : screen === 'rules' ? (
