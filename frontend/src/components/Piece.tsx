@@ -1,4 +1,5 @@
 import { motion } from 'framer-motion'
+import { PIECE_GLYPH } from '../lib/constants'
 import type { PieceColor, PieceType } from '../lib/types'
 
 interface PieceProps {
@@ -7,18 +8,8 @@ interface PieceProps {
   animate?: boolean
 }
 
-/** Mismos glifos rellenos para ambos colores; el tono lo da CSS (las blancas huecas de Unicode suelen verse vacías). */
-const GLYPHS: Record<PieceType, string> = {
-  k: '♚',
-  q: '♛',
-  r: '♜',
-  b: '♝',
-  n: '♞',
-  p: '♟',
-}
-
 export default function Piece({ type, color, animate = true }: PieceProps) {
-  const symbol = GLYPHS[type]
+  const symbol = PIECE_GLYPH[type]
   const className = `chess-piece ${color === 'w' ? 'piece-white' : 'piece-black'}`
 
   if (!animate) {

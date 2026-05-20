@@ -1,8 +1,8 @@
 import { useRef, useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { PIECE_UNICODE } from '../lib/constants'
+import { pieceGlyph } from '../lib/constants'
 import { translateMoveDescription, ui } from '../lib/i18n'
-import type { Language, MoveInfo } from '../lib/types'
+import type { Language, MoveInfo, PieceType } from '../lib/types'
 
 interface MoveHistoryProps {
   history: MoveInfo[]
@@ -73,7 +73,7 @@ export default function MoveHistory({ history, language, pgn, showCopy = false }
       <div ref={scrollRef} className="max-h-44 overflow-y-auto">
         <AnimatePresence initial={false}>
           {history.map((move, i) => {
-            const icon = PIECE_UNICODE[`${move.color}${move.piece.toUpperCase()}`] || ''
+            const icon = pieceGlyph(move.color, move.piece as PieceType)
             const isWhite = move.color === 'w'
             const moveNum = Math.floor(i / 2) + 1
             const isLast = i === history.length - 1
@@ -84,21 +84,27 @@ export default function MoveHistory({ history, language, pgn, showCopy = false }
                 initial={{ opacity: 0, x: -8 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ duration: 0.15 }}
-                className={`flex items-center gap-2 px-1 py-1 text-ui-sm
+                className={`flex min-w-0 items-center gap-1.5 px-1 py-1 text-ui-sm
                   ${isLast ? 'text-accent' : 'text-neutral-500'}
                 `}
               >
-                {isWhite && (
-                  <span className="w-5 text-right font-mono text-ui-xs text-neutral-600">
+                {isWhite ? (
+                  <span className="w-6 shrink-0 text-right font-mono text-ui-xs text-neutral-600">
                     {moveNum}.
                   </span>
+                ) : (
+                  <span className="w-6 shrink-0" />
                 )}
-                {!isWhite && <span className="w-5" />}
-                <span className={`chess-piece text-sm leading-none ${isWhite ? 'piece-white' : 'piece-black'}`}>
+                <span
+                  className={`chess-piece-inline ${isWhite ? 'piece-white' : 'piece-black'}`}
+                  aria-hidden
+                >
                   {icon}
                 </span>
-                <span className="truncate">{translateMoveDescription(move.description, language)}</span>
-                <span className="ml-auto font-mono text-ui-xs text-neutral-600">{move.san}</span>
+                <span className="min-w-0 flex-1 truncate">
+                  {translateMoveDescription(move.description, language)}
+                </span>
+                <span className="shrink-0 font-mono text-ui-xs text-neutral-600">{move.san}</span>
               </motion.div>
             )
           })}

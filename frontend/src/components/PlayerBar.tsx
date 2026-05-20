@@ -1,4 +1,4 @@
-import { PIECE_UNICODE, PIECE_VALUES, CAPTURE_ORDER } from '../lib/constants'
+import { pieceGlyph, PIECE_VALUES, CAPTURE_ORDER } from '../lib/constants'
 import { formatTime } from '../hooks/useTimer'
 import type { PieceColor, PieceType } from '../lib/types'
 
@@ -48,9 +48,9 @@ export default function PlayerBar({
         {sortedCaptures.map((p, i) => (
           <span
             key={i}
-            className={`chess-piece text-ui-sm leading-none opacity-60 ${capturedColor === 'w' ? 'piece-white' : 'piece-black'}`}
+            className={`chess-piece-inline opacity-60 ${capturedColor === 'w' ? 'piece-white' : 'piece-black'}`}
           >
-            {PIECE_UNICODE[`${capturedColor}${p.toUpperCase()}`] || ''}
+            {pieceGlyph(capturedColor, p)}
           </span>
         ))}
         {materialDiff > 0 && (

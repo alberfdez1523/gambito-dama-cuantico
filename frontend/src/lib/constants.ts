@@ -1,11 +1,33 @@
 import type { DifficultyMeta, PieceType } from './types'
 
-// ─── Unicode de piezas (con FE0E para presentación de texto) ───
+/** Mismos glifos rellenos que el tablero (`Piece.tsx`); el color lo da CSS. */
+export const PIECE_GLYPH: Record<PieceType, string> = {
+  k: '♚',
+  q: '♛',
+  r: '♜',
+  b: '♝',
+  n: '♞',
+  p: '♟',
+}
+
+export function pieceGlyph(_color: string, type: PieceType): string {
+  return PIECE_GLYPH[type]
+}
+
+/** @deprecated Usar `pieceGlyph` + glifos rellenos del tablero */
 export const PIECE_UNICODE: Record<string, string> = {
-  wK: '\u265A\uFE0E', wQ: '\u265B\uFE0E', wR: '\u265C\uFE0E',
-  wB: '\u265D\uFE0E', wN: '\u265E\uFE0E', wP: '\u265F\uFE0E',
-  bK: '\u265A\uFE0E', bQ: '\u265B\uFE0E', bR: '\u265C\uFE0E',
-  bB: '\u265D\uFE0E', bN: '\u265E\uFE0E', bP: '\u265F\uFE0E',
+  wK: PIECE_GLYPH.k,
+  wQ: PIECE_GLYPH.q,
+  wR: PIECE_GLYPH.r,
+  wB: PIECE_GLYPH.b,
+  wN: PIECE_GLYPH.n,
+  wP: PIECE_GLYPH.p,
+  bK: PIECE_GLYPH.k,
+  bQ: PIECE_GLYPH.q,
+  bR: PIECE_GLYPH.r,
+  bB: PIECE_GLYPH.b,
+  bN: PIECE_GLYPH.n,
+  bP: PIECE_GLYPH.p,
 }
 
 // ─── Valor de las piezas (para diferencia de material) ───
