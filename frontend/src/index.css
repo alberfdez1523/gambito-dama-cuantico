@@ -147,8 +147,11 @@ body {
 /* ── Chess Pieces ── */
 
 .chess-piece {
-  font-family: 'Segoe UI Symbol', 'Noto Sans Symbols 2', 'Apple Color Emoji', sans-serif;
+  /* Noto primero: misma silueta en móvil, tablet y PC (evita emoji de color del sistema). */
+  font-family: 'Noto Sans Symbols 2', 'Segoe UI Symbol', sans-serif;
   font-size: calc(var(--sq-size) * 0.82);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
   line-height: 0.88;
   user-select: none;
   cursor: grab;

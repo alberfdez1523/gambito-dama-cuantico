@@ -1,4 +1,10 @@
-import type { GameConfig, GameMode, PieceColor, QState } from './types'
+import type { GameConfig, GameMode, PieceColor, QMeasurementEvent, QState } from './types'
+
+export interface QPendingMeasurement {
+  event: QMeasurementEvent
+  /** Jugador que debe girar la ruleta (autor del último movimiento con medición). */
+  initiator: PieceColor
+}
 
 export type RoomStatus = 'waiting' | 'playing' | 'finished'
 
@@ -13,6 +19,8 @@ export interface ClassicRoomState {
 export interface QuantumRoomState {
   type: 'quantum'
   qstate: QState
+  /** Bloquea al rival hasta que el iniciador cierre la ruleta. */
+  pendingMeasurement?: QPendingMeasurement | null
 }
 
 export type RoomGameState = ClassicRoomState | QuantumRoomState
@@ -22,6 +30,28 @@ export function quantumStateFingerprint(q: QState): string {
   const last = q.history[q.history.length - 1]
   const lastKey = last ? `${last.from}-${last.to}-${last.pieceType}` : ''
   return `${q.turn}|${q.moveNumber}|${q.history.length}|${lastKey}|${q.gameOver?.winner ?? ''}`
+}
+
+function pendingMeasurementFingerprint(pm: QPendingMeasurement | null | undefined): string {
+  if (!pm) return '0'
+  const e = pm.event
+  return `${pm.initiator}:${e.step}:${e.target}:${e.result}:${Math.round(e.roll * 1000)}`
+}
+
+export function quantumRoomFingerprint(room: QuantumRoomState): string {
+  return `${quantumStateFingerprint(room.qstate)}|${pendingMeasurementFingerprint(room.pendingMeasurement)}`
+}
+
+/** Tras un movimiento local con medición, empaqueta el evento para sincronizar la ruleta. */
+export function pendingMeasurementFromLastMove(
+  qstate: QState,
+  playerColor: PieceColor,
+): QPendingMeasurement | null {
+  const last = qstate.history[qstate.history.length - 1]
+  if (!last?.measurement) return null
+  const initiator = qstate.turn === 'w' ? 'b' : 'w'
+  if (initiator !== playerColor) return null
+  return { event: last.measurement, initiator }
 }
 
 export interface OnlineRoomRow {

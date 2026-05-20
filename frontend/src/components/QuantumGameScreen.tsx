@@ -18,7 +18,11 @@ import { useAmbientMusic } from '../hooks/useAmbientMusic'
 import { useTimer } from '../hooks/useTimer'
 import { getPlayerLabel, ui } from '../lib/i18n'
 import type { AppSettings } from '../lib/settings'
-import { quantumStateFingerprint } from '../lib/onlineTypes'
+import {
+  pendingMeasurementFromLastMove,
+  quantumRoomFingerprint,
+  quantumStateFingerprint,
+} from '../lib/onlineTypes'
 import type { GameConfig, Language, PieceColor, QMoveMode, QState } from '../lib/types'
 
 interface QuantumGameScreenProps {
@@ -67,34 +71,64 @@ export default function QuantumGameScreen({
   const loadQuantumRef = useRef<(q: QState) => void>(() => {})
   const turnRef = useRef<PieceColor>('w')
   const exportQStateRef = useRef<() => QState>(() => ({} as QState))
+  const measurementEventRef = useRef(false)
+  const hadPendingRef = useRef(false)
+  const [measurementReleased, setMeasurementReleased] = useState(false)
 
   const onStateChange = useCallback(
     (engine: import('../lib/quantumEngine').QuantumChessEngine) => {
-      if (config.opponentMode === 'online') {
-        void onlineSync.pushQuantumState(engine.exportState(), engine.state.turn).then((ok) => {
-          if (!ok && onlineSync.remoteState?.type === 'quantum') {
-            loadQuantumRef.current(onlineSync.remoteState.qstate)
-          }
-        })
-      }
+      if (config.opponentMode !== 'online') return
+      const qstate = engine.exportState()
+      const pending = pendingMeasurementFromLastMove(qstate, config.playerColor)
+      void onlineSync.pushQuantumState(qstate, engine.state.turn, pending).then((ok) => {
+        if (!ok && onlineSync.remoteState?.type === 'quantum') {
+          loadQuantumRef.current(onlineSync.remoteState.qstate)
+        }
+      })
     },
-    [config.opponentMode, onlineSync],
+    [config.opponentMode, config.playerColor, onlineSync],
   )
 
   const game = useQuantumChess(config, sounds, language, {
     onStateChange,
     canMove: () => {
       if (config.opponentMode !== 'online') return true
+      if (measurementEventRef.current) return false
       return onlineSync.canPlayQuantumMove(turnRef.current, exportQStateRef.current())
     },
   })
   loadQuantumRef.current = game.loadQuantumState
   turnRef.current = game.turn
   exportQStateRef.current = game.exportState
+  measurementEventRef.current = !!game.measurementEvent
   const isOnline = game.isOnline
+
+  const handleDismissMeasurement = useCallback(() => {
+    game.dismissMeasurement()
+    if (config.opponentMode !== 'online') return
+    void onlineSync.pushQuantumState(game.exportState(), game.turn, null)
+  }, [config.opponentMode, game, onlineSync])
   const reduceMotion = useReducedMotion()
   const [boardReady, setBoardReady] = useState(false)
   const [mobileModesOpen, setMobileModesOpen] = useState(false)
+
+  const pending = onlineSync.pendingMeasurement
+  const isInitiator = pending?.initiator === config.playerColor
+  const isWaitingOpponentMeasurement =
+    isOnline && !!pending && !isInitiator
+  const rouletteMeasurement =
+    game.measurementEvent ??
+    (isInitiator && pending ? pending.event : null)
+
+  useEffect(() => {
+    if (!isOnline) return
+    if (hadPendingRef.current && !pending) {
+      setMeasurementReleased(true)
+      const id = window.setTimeout(() => setMeasurementReleased(false), 4500)
+      return () => window.clearTimeout(id)
+    }
+    hadPendingRef.current = !!pending
+  }, [isOnline, pending])
 
   useEffect(() => {
     const timer = setTimeout(() => setBoardReady(true), 80)
@@ -127,15 +161,20 @@ export default function QuantumGameScreen({
     if (!onlineSync.shouldApplyRemote || !onlineSync.remoteState) return
     if (onlineSync.remoteState.type !== 'quantum') return
 
-    const remote = onlineSync.remoteState.qstate
+    const remoteRoom = onlineSync.remoteState
     const local = game.exportState()
-    if (quantumStateFingerprint(local) === quantumStateFingerprint(remote)) {
+    const localRoom = {
+      type: 'quantum' as const,
+      qstate: local,
+      pendingMeasurement: onlineSync.pendingMeasurement,
+    }
+    if (quantumRoomFingerprint(localRoom) === quantumRoomFingerprint(remoteRoom)) {
       onlineSync.markRemoteApplied(onlineSync.remoteVersion)
       return
     }
 
     onlineSync.beginRemoteApply()
-    game.loadQuantumState(remote)
+    game.loadQuantumState(remoteRoom.qstate)
     onlineSync.markRemoteApplied(onlineSync.remoteVersion)
     onlineSync.endRemoteApply()
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -147,7 +186,7 @@ export default function QuantumGameScreen({
     const remote = onlineSync.remoteState
     if (remote?.type !== 'quantum') return
     const local = game.exportState()
-    if (quantumStateFingerprint(local) === quantumStateFingerprint(remote.qstate)) return
+    if (quantumRoomFingerprint({ type: 'quantum', qstate: local, pendingMeasurement: onlineSync.pendingMeasurement }) === quantumRoomFingerprint(remote)) return
 
     onlineSync.beginRemoteApply()
     game.loadQuantumState(remote.qstate)
@@ -279,6 +318,26 @@ export default function QuantumGameScreen({
           </button>
         </div>
       </header>
+
+      {isWaitingOpponentMeasurement && (
+        <motion.div
+          className="border-b border-indigo-500/25 bg-indigo-500/10 px-4 py-2.5 text-center text-ui-sm text-indigo-200"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+        >
+          {t.measurementPending}
+        </motion.div>
+      )}
+
+      {measurementReleased && isOnline && onlineSync.isMyTurn && (
+        <motion.div
+          className="border-b border-emerald-500/25 bg-emerald-500/10 px-4 py-2.5 text-center text-ui-sm text-emerald-200"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+        >
+          {t.measurementCanMove}
+        </motion.div>
+      )}
 
       <div className="flex flex-1 items-start justify-center gap-0 px-4 py-4 lg:py-8">
         <motion.div
@@ -514,9 +573,9 @@ export default function QuantumGameScreen({
         language={language}
       />
       <QuantumMeasurementRoulette
-        visible={!!game.measurementEvent}
-        measurement={game.measurementEvent}
-        onClose={game.dismissMeasurement}
+        visible={!!rouletteMeasurement}
+        measurement={rouletteMeasurement}
+        onClose={handleDismissMeasurement}
         language={language}
       />
     </div>

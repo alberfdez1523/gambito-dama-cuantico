@@ -48,7 +48,7 @@ export default function PlayerBar({
         {sortedCaptures.map((p, i) => (
           <span
             key={i}
-            className={`text-ui-sm leading-none opacity-60 ${capturedColor === 'w' ? 'piece-white' : 'piece-black'}`}
+            className={`chess-piece text-ui-sm leading-none opacity-60 ${capturedColor === 'w' ? 'piece-white' : 'piece-black'}`}
           >
             {PIECE_UNICODE[`${capturedColor}${p.toUpperCase()}`] || ''}
           </span>

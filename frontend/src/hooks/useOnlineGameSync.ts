@@ -1,8 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Chess } from 'chess.js'
 import type { GameConfig, PieceColor } from '../lib/types'
-import type { ClassicRoomState, OnlineRoomRow, QuantumRoomState } from '../lib/onlineTypes'
-import { quantumStateFingerprint } from '../lib/onlineTypes'
+import type {
+  ClassicRoomState,
+  OnlineRoomRow,
+  QPendingMeasurement,
+  QuantumRoomState,
+} from '../lib/onlineTypes'
+import { quantumRoomFingerprint, quantumStateFingerprint } from '../lib/onlineTypes'
 import type { OnlineMeta } from '../lib/types'
 import {
   abandonOnlineRoom,
@@ -133,13 +138,20 @@ export function useOnlineGameSync({ config, enabled }: UseOnlineGameSyncOptions)
     [isOnline, room],
   )
 
+  const pendingMeasurement: QPendingMeasurement | null =
+    room?.state?.type === 'quantum' ? (room.state.pendingMeasurement ?? null) : null
+
+  const isMeasurementBlocking =
+    isOnline && !!pendingMeasurement
+
   const canPlayQuantumMove = useCallback(
     (localTurn: PieceColor, local: QState) => {
       if (!isOnline) return true
+      if (isMeasurementBlocking) return false
       if (!isMyTurn || localTurn !== config.playerColor) return false
       return isQuantumSynced(local)
     },
-    [isOnline, isMyTurn, config.playerColor, isQuantumSynced],
+    [isOnline, isMeasurementBlocking, isMyTurn, config.playerColor, isQuantumSynced],
   )
 
   const opponentConnected = isOnline && room
@@ -201,7 +213,11 @@ export function useOnlineGameSync({ config, enabled }: UseOnlineGameSyncOptions)
   )
 
   const pushQuantumState = useCallback(
-    async (qstate: QState, turn: PieceColor) => {
+    async (
+      qstate: QState,
+      turn: PieceColor,
+      pending: QPendingMeasurement | null | undefined = undefined,
+    ) => {
       if (!online?.roomId || applyingRemote.current || pushingRef.current) return false
       const active = await waitForRoom()
       if (!active) {
@@ -214,23 +230,31 @@ export function useOnlineGameSync({ config, enabled }: UseOnlineGameSyncOptions)
         return false
       }
 
-      const serverQ = active.state.qstate
-      if (quantumStateFingerprint(serverQ) === quantumStateFingerprint(qstate)) {
+      const serverRoom = active.state
+      const nextRoom: QuantumRoomState = {
+        type: 'quantum',
+        qstate,
+        pendingMeasurement: pending === undefined ? (serverRoom.pendingMeasurement ?? null) : pending,
+      }
+      if (quantumRoomFingerprint(serverRoom) === quantumRoomFingerprint(nextRoom)) {
         setSyncError(null)
         return true
       }
 
-      if (active.turn !== config.playerColor) {
+      const onlyPendingChange =
+        quantumStateFingerprint(serverRoom.qstate) === quantumStateFingerprint(qstate) &&
+        quantumRoomFingerprint(serverRoom) !== quantumRoomFingerprint(nextRoom)
+
+      if (active.turn !== config.playerColor && !onlyPendingChange) {
         await refreshRoomFromServer()
         setSyncError('OUT_OF_SYNC')
         return false
       }
 
-      const state: QuantumRoomState = { type: 'quantum', qstate }
       pushingRef.current = true
       try {
         const updated = await pushRoomState(active.id, active.version, {
-          state,
+          state: nextRoom,
           turn,
           measurement_seed: active.measurement_seed,
         })
@@ -300,6 +324,8 @@ export function useOnlineGameSync({ config, enabled }: UseOnlineGameSyncOptions)
     canPlayMove,
     isQuantumSynced,
     canPlayQuantumMove,
+    pendingMeasurement,
+    isMeasurementBlocking,
     opponentConnected,
     opponentLeft,
     syncError,

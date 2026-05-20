@@ -94,7 +94,7 @@ export default function MoveHistory({ history, language, pgn, showCopy = false }
                   </span>
                 )}
                 {!isWhite && <span className="w-5" />}
-                <span className={`text-sm leading-none ${isWhite ? 'piece-white' : 'piece-black'}`}>
+                <span className={`chess-piece text-sm leading-none ${isWhite ? 'piece-white' : 'piece-black'}`}>
                   {icon}
                 </span>
                 <span className="truncate">{translateMoveDescription(move.description, language)}</span>
