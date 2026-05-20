@@ -63,10 +63,16 @@ export default function QuantumGameScreen({
     return () => window.clearTimeout(id)
   }, [onlineSync.opponentLeft, handleLeaveToMenu])
 
+  const loadQuantumRef = useRef<(q: import('../lib/types').QState) => void>(() => {})
+
   const onStateChange = useCallback(
     (engine: import('../lib/quantumEngine').QuantumChessEngine) => {
       if (config.opponentMode === 'online') {
-        void onlineSync.pushQuantumState(engine.exportState(), engine.state.turn)
+        void onlineSync.pushQuantumState(engine.exportState(), engine.state.turn).then((ok) => {
+          if (!ok && onlineSync.remoteState?.type === 'quantum') {
+            loadQuantumRef.current(onlineSync.remoteState.qstate)
+          }
+        })
       }
     },
     [config.opponentMode, onlineSync],
@@ -74,8 +80,15 @@ export default function QuantumGameScreen({
 
   const game = useQuantumChess(config, sounds, language, {
     onStateChange,
-    canMove: () => config.opponentMode !== 'online' || onlineSync.isMyTurn,
+    canMove: () => {
+      if (config.opponentMode !== 'online') return true
+      if (!onlineSync.isMyTurn) return false
+      const remote = onlineSync.remoteState
+      if (remote?.type !== 'quantum') return false
+      return JSON.stringify(game.exportState()) === JSON.stringify(remote.qstate)
+    },
   })
+  loadQuantumRef.current = game.loadQuantumState
   const isOnline = game.isOnline
   const reduceMotion = useReducedMotion()
   const [boardReady, setBoardReady] = useState(false)

@@ -65,18 +65,20 @@ export default function GameScreen({
   }, [onlineSync.opponentLeft, handleLeaveToMenu])
 
   const onMoveApplied = useCallback(
-    (fen: string, nextTurn: import('../lib/types').PieceColor, lastMove: { from: string; to: string }) => {
+    async (fen: string, nextTurn: import('../lib/types').PieceColor, lastMove: { from: string; to: string }) => {
       if (config.opponentMode === 'online') {
-        void onlineSync.pushClassicState(fen, nextTurn, lastMove)
+        await onlineSync.pushClassicState(fen, nextTurn, lastMove)
       }
     },
     [config.opponentMode, onlineSync],
   )
 
+  const localFenRef = useRef('')
   const game = useChessGame(config, sounds, language, {
     onMoveApplied,
-    canMove: () => config.opponentMode !== 'online' || onlineSync.isMyTurn,
+    canMove: () => config.opponentMode !== 'online' || onlineSync.canPlayMove(localFenRef.current),
   })
+  localFenRef.current = game.fen
 
   const timer = useTimer({
     enabled: config.useTimer,
@@ -115,6 +117,20 @@ export default function GameScreen({
     onlineSync.endRemoteApply()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [onlineSync.remoteVersion, game.fen])
+
+  useEffect(() => {
+    if (config.opponentMode !== 'online') return
+    if (onlineSync.syncError !== 'CONFLICT' && onlineSync.syncError !== 'OUT_OF_SYNC') return
+    const remote = onlineSync.remoteState
+    if (remote?.type !== 'classic' || !onlineSync.validateClassicFen(remote.fen)) return
+    if (game.fen === remote.fen) return
+
+    onlineSync.beginRemoteApply()
+    game.loadFen(remote.fen, remote.lastMove ?? null)
+    onlineSync.markRemoteApplied(onlineSync.remoteVersion)
+    onlineSync.endRemoteApply()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [onlineSync.syncError, onlineSync.remoteVersion])
 
   useEffect(() => {
     if (game.gameOverInfo && config.opponentMode === 'online') {
@@ -209,8 +225,11 @@ export default function GameScreen({
 
       {onlineSync.syncError && isOnline && (
         <motion.div className="border-b border-amber-500/20 bg-amber-500/10 px-4 py-2.5 text-center text-ui-sm text-amber-200">
-          {language === 'es' ? 'Error de sincronización: ' : 'Sync error: '}
-          {onlineSync.syncError}
+          {onlineSync.syncError === 'CONFLICT' || onlineSync.syncError === 'OUT_OF_SYNC'
+            ? language === 'es'
+              ? 'Tablero resincronizado con el servidor.'
+              : 'Board resynced with server.'
+            : `${language === 'es' ? 'Error de sincronización: ' : 'Sync error: '}${onlineSync.syncError}`}
         </motion.div>
       )}
 

@@ -183,30 +183,23 @@ export async function pushRoomState(
   return data as OnlineRoomRow
 }
 
-/** Envía estado leyendo la versión actual de la BD y reintentando si hay conflicto. */
-export async function pushRoomStateWithRetry(
-  roomId: string,
-  patch: {
-    state: RoomGameState
-    turn: PieceColor
-    status?: OnlineRoomRow['status']
-    measurement_seed?: string | null
-  },
-  maxAttempts = 6,
-): Promise<OnlineRoomRow> {
-  let lastError: Error | null = null
-  for (let attempt = 0; attempt < maxAttempts; attempt++) {
-    const current = await fetchOnlineRoom(roomId)
-    if (!current) throw new Error('ROOM_NOT_FOUND')
+/** Comprueba que `targetFen` sea un solo movimiento legal desde `baseFen`. */
+export function isLegalMoveFromFen(
+  baseFen: string,
+  targetFen: string,
+  lastMove: { from: string; to: string },
+): boolean {
+  const promotions: Array<'q' | 'r' | 'b' | 'n' | undefined> = ['q', 'r', 'b', 'n', undefined]
+  for (const promotion of promotions) {
     try {
-      return await pushRoomState(current.id, current.version, patch)
-    } catch (e) {
-      lastError = e instanceof Error ? e : new Error('Sync error')
-      if (lastError.message !== 'VERSION_CONFLICT') throw lastError
-      await new Promise((r) => setTimeout(r, 40 * (attempt + 1)))
+      const game = new Chess(baseFen)
+      const result = game.move({ from: lastMove.from, to: lastMove.to, promotion })
+      if (result && game.fen() === targetFen) return true
+    } catch {
+      /* siguiente promoción */
     }
   }
-  throw lastError ?? new Error('VERSION_CONFLICT')
+  return false
 }
 
 export async function finishOnlineRoom(roomId: string): Promise<void> {
