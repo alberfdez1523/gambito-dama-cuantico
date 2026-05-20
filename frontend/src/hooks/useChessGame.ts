@@ -97,7 +97,12 @@ export interface GameSounds {
 // ─── Hook principal ───
 
 export interface UseChessGameOptions {
-  onMoveApplied?: (fen: string, nextTurn: PieceColor, lastMove: { from: string; to: string }) => void
+  onMoveApplied?: (
+    fen: string,
+    nextTurn: PieceColor,
+    lastMove: { from: string; to: string },
+    pgn: string,
+  ) => void
   /** Si devuelve false, no se permite mover (p. ej. multijugador online fuera de turno). */
   canMove?: () => boolean
 }
@@ -258,7 +263,7 @@ export function useChessGame(
       setFen(game.fen())
 
       if (isOnline && onMoveAppliedRef.current) {
-        void onMoveAppliedRef.current(game.fen(), game.turn() as PieceColor, { from, to })
+        void onMoveAppliedRef.current(game.fen(), game.turn() as PieceColor, { from, to }, game.pgn())
       }
 
       const endInfo = detectGameEnd(game, config.playerColor, isAIMode, language)
@@ -444,14 +449,27 @@ export function useChessGame(
     [config.playerColor, gameOverInfo, doMove, isAIMode, isOnline]
   )
 
-  const loadFen = useCallback((fen: string, lastMove?: { from: string; to: string } | null) => {
-    const game = new Chess(fen)
-    gameRef.current = game
-    setSelectedSquare(null)
-    setLastMove(lastMove ?? null)
-    setFen(game.fen())
-    setGameOverInfo(null)
-  }, [])
+  const loadFen = useCallback(
+    (fen: string, lastMove?: { from: string; to: string } | null, pgn?: string) => {
+      const game = new Chess()
+      if (pgn?.trim()) {
+        try {
+          const loaded = (game as Chess & { load_pgn: (p: string) => boolean }).load_pgn(pgn)
+          if (!loaded) game.load(fen)
+        } catch {
+          game.load(fen)
+        }
+      } else {
+        game.load(fen)
+      }
+      gameRef.current = game
+      setSelectedSquare(null)
+      setLastMove(lastMove ?? null)
+      setFen(game.fen())
+      setGameOverInfo(null)
+    },
+    [],
+  )
 
   const handlePromotion = useCallback(
     (piece: string) => {

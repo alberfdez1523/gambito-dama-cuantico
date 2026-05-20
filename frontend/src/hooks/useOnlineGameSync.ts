@@ -133,7 +133,12 @@ export function useOnlineGameSync({ config, enabled }: UseOnlineGameSyncOptions)
     : false
 
   const pushClassicState = useCallback(
-    async (fen: string, turn: PieceColor, lastMove?: { from: string; to: string } | null) => {
+    async (
+      fen: string,
+      turn: PieceColor,
+      lastMove?: { from: string; to: string } | null,
+      pgn?: string,
+    ) => {
       if (!online?.roomId || applyingRemote.current || pushingRef.current) return false
       const active = await waitForRoom()
       if (!active || active.state.type !== 'classic') {
@@ -153,7 +158,7 @@ export function useOnlineGameSync({ config, enabled }: UseOnlineGameSyncOptions)
         return false
       }
 
-      const state: ClassicRoomState = { type: 'classic', fen, lastMove }
+      const state: ClassicRoomState = { type: 'classic', fen, lastMove, pgn: pgn ?? '' }
       pushingRef.current = true
       try {
         const updated = await pushRoomState(active.id, active.version, { state, turn })

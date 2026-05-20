@@ -65,9 +65,14 @@ export default function GameScreen({
   }, [onlineSync.opponentLeft, handleLeaveToMenu])
 
   const onMoveApplied = useCallback(
-    async (fen: string, nextTurn: import('../lib/types').PieceColor, lastMove: { from: string; to: string }) => {
+    async (
+      fen: string,
+      nextTurn: import('../lib/types').PieceColor,
+      lastMove: { from: string; to: string },
+      pgn: string,
+    ) => {
       if (config.opponentMode === 'online') {
-        await onlineSync.pushClassicState(fen, nextTurn, lastMove)
+        await onlineSync.pushClassicState(fen, nextTurn, lastMove, pgn)
       }
     },
     [config.opponentMode, onlineSync],
@@ -106,13 +111,18 @@ export default function GameScreen({
     if (!onlineSync.shouldApplyRemote || !onlineSync.remoteState) return
     if (onlineSync.remoteState.type !== 'classic') return
     if (!onlineSync.validateClassicFen(onlineSync.remoteState.fen)) return
-    if (game.fen === onlineSync.remoteState.fen) {
+    const remote = onlineSync.remoteState
+    if (game.fen === remote.fen && game.pgn === (remote.pgn ?? '')) {
       onlineSync.markRemoteApplied(onlineSync.remoteVersion)
       return
     }
 
     onlineSync.beginRemoteApply()
-    game.loadFen(onlineSync.remoteState.fen, onlineSync.remoteState.lastMove ?? null)
+    game.loadFen(
+      onlineSync.remoteState.fen,
+      onlineSync.remoteState.lastMove ?? null,
+      onlineSync.remoteState.pgn,
+    )
     onlineSync.markRemoteApplied(onlineSync.remoteVersion)
     onlineSync.endRemoteApply()
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -126,7 +136,7 @@ export default function GameScreen({
     if (game.fen === remote.fen) return
 
     onlineSync.beginRemoteApply()
-    game.loadFen(remote.fen, remote.lastMove ?? null)
+    game.loadFen(remote.fen, remote.lastMove ?? null, remote.pgn)
     onlineSync.markRemoteApplied(onlineSync.remoteVersion)
     onlineSync.endRemoteApply()
     // eslint-disable-next-line react-hooks/exhaustive-deps

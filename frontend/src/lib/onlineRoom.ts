@@ -19,10 +19,12 @@ function randomSeed(): string {
 }
 
 export function initialClassicState(): ClassicRoomState {
+  const game = new Chess()
   return {
     type: 'classic',
-    fen: new Chess().fen(),
+    fen: game.fen(),
     lastMove: null,
+    pgn: '',
   }
 }
 

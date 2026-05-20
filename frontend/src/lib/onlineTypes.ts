@@ -6,6 +6,8 @@ export interface ClassicRoomState {
   type: 'classic'
   fen: string
   lastMove?: { from: string; to: string } | null
+  /** PGN completo para reconstruir el historial de jugadas en ambos clientes */
+  pgn?: string
 }
 
 export interface QuantumRoomState {
