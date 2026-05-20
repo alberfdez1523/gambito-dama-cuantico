@@ -73,7 +73,10 @@ export default function GameScreen({
     [config.opponentMode, onlineSync],
   )
 
-  const game = useChessGame(config, sounds, language, { onMoveApplied })
+  const game = useChessGame(config, sounds, language, {
+    onMoveApplied,
+    canMove: () => config.opponentMode !== 'online' || onlineSync.isMyTurn,
+  })
 
   const timer = useTimer({
     enabled: config.useTimer,
@@ -101,13 +104,17 @@ export default function GameScreen({
     if (!onlineSync.shouldApplyRemote || !onlineSync.remoteState) return
     if (onlineSync.remoteState.type !== 'classic') return
     if (!onlineSync.validateClassicFen(onlineSync.remoteState.fen)) return
+    if (game.fen === onlineSync.remoteState.fen) {
+      onlineSync.markRemoteApplied(onlineSync.remoteVersion)
+      return
+    }
 
     onlineSync.beginRemoteApply()
     game.loadFen(onlineSync.remoteState.fen, onlineSync.remoteState.lastMove ?? null)
     onlineSync.markRemoteApplied(onlineSync.remoteVersion)
     onlineSync.endRemoteApply()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [onlineSync.remoteVersion])
+  }, [onlineSync.remoteVersion, game.fen])
 
   useEffect(() => {
     if (game.gameOverInfo && config.opponentMode === 'online') {
@@ -199,6 +206,13 @@ export default function GameScreen({
           </button>
         </div>
       </header>
+
+      {onlineSync.syncError && isOnline && (
+        <motion.div className="border-b border-amber-500/20 bg-amber-500/10 px-4 py-2.5 text-center text-ui-sm text-amber-200">
+          {language === 'es' ? 'Error de sincronización: ' : 'Sync error: '}
+          {onlineSync.syncError}
+        </motion.div>
+      )}
 
       {(game.engineError || game.evalError) && (
         <div className="border-b border-red-500/20 bg-red-500/10 px-4 py-2.5">

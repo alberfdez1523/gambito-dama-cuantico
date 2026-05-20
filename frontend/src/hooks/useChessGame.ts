@@ -98,6 +98,8 @@ export interface GameSounds {
 
 export interface UseChessGameOptions {
   onMoveApplied?: (fen: string, nextTurn: PieceColor, lastMove: { from: string; to: string }) => void
+  /** Si devuelve false, no se permite mover (p. ej. multijugador online fuera de turno). */
+  canMove?: () => boolean
 }
 
 export function useChessGame(
@@ -124,6 +126,10 @@ export function useChessGame(
   const [gameOverInfo, setGameOverInfo] = useState<GameOverInfo | null>(null)
   const isAIMode = config.opponentMode === 'ai'
   const isOnline = config.opponentMode === 'online'
+  const onMoveAppliedRef = useRef(options.onMoveApplied)
+  onMoveAppliedRef.current = options.onMoveApplied
+  const canMoveRef = useRef(options.canMove)
+  canMoveRef.current = options.canMove
   const t = ui(language)
 
   useEffect(() => {
@@ -251,8 +257,8 @@ export function useChessGame(
       setLastMove({ from, to })
       setFen(game.fen())
 
-      if (isOnline && options.onMoveApplied) {
-        options.onMoveApplied(game.fen(), game.turn() as PieceColor, { from, to })
+      if (isOnline && onMoveAppliedRef.current) {
+        void onMoveAppliedRef.current(game.fen(), game.turn() as PieceColor, { from, to })
       }
 
       const endInfo = detectGameEnd(game, config.playerColor, isAIMode, language)
@@ -377,7 +383,7 @@ export function useChessGame(
     (sq: string) => {
       const game = gameRef.current
       if (isThinkingRef.current || gameOverInfo) return
-      if (isOnline && game.turn() !== config.playerColor) return
+      if (isOnline && (canMoveRef.current ? !canMoveRef.current() : game.turn() !== config.playerColor)) return
       const allowedColor = isAIMode || isOnline ? config.playerColor : (game.turn() as PieceColor)
       if (game.turn() !== allowedColor) return
 
@@ -414,7 +420,7 @@ export function useChessGame(
     (from: string, to: string) => {
       const game = gameRef.current
       if (isThinkingRef.current || gameOverInfo) return
-      if (isOnline && game.turn() !== config.playerColor) return
+      if (isOnline && (canMoveRef.current ? !canMoveRef.current() : game.turn() !== config.playerColor)) return
       const allowedColor = isAIMode || isOnline ? config.playerColor : (game.turn() as PieceColor)
       if (game.turn() !== allowedColor) return
 
@@ -459,7 +465,7 @@ export function useChessGame(
   const doClassicalCastle = useCallback((side: 'k' | 'q') => {
     const game = gameRef.current
     if (isThinkingRef.current || gameOverInfo) return
-    if (isOnline && game.turn() !== config.playerColor) return
+    if (isOnline && (canMoveRef.current ? !canMoveRef.current() : game.turn() !== config.playerColor)) return
 
     const allowedColor = isAIMode || isOnline ? config.playerColor : (game.turn() as PieceColor)
     if (game.turn() !== allowedColor) return

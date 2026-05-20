@@ -183,6 +183,32 @@ export async function pushRoomState(
   return data as OnlineRoomRow
 }
 
+/** Envía estado leyendo la versión actual de la BD y reintentando si hay conflicto. */
+export async function pushRoomStateWithRetry(
+  roomId: string,
+  patch: {
+    state: RoomGameState
+    turn: PieceColor
+    status?: OnlineRoomRow['status']
+    measurement_seed?: string | null
+  },
+  maxAttempts = 6,
+): Promise<OnlineRoomRow> {
+  let lastError: Error | null = null
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    const current = await fetchOnlineRoom(roomId)
+    if (!current) throw new Error('ROOM_NOT_FOUND')
+    try {
+      return await pushRoomState(current.id, current.version, patch)
+    } catch (e) {
+      lastError = e instanceof Error ? e : new Error('Sync error')
+      if (lastError.message !== 'VERSION_CONFLICT') throw lastError
+      await new Promise((r) => setTimeout(r, 40 * (attempt + 1)))
+    }
+  }
+  throw lastError ?? new Error('VERSION_CONFLICT')
+}
+
 export async function finishOnlineRoom(roomId: string): Promise<void> {
   const supabase = getSupabase()
   await supabase

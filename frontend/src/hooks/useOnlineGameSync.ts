@@ -6,8 +6,9 @@ import type { OnlineMeta } from '../lib/types'
 import {
   abandonOnlineRoom,
   finishOnlineRoom,
+  fetchOnlineRoom,
   getInviteUrl,
-  pushRoomState,
+  pushRoomStateWithRetry,
   subscribeToRoom,
 } from '../lib/onlineRoom'
 import type { QState } from '../lib/types'
@@ -17,6 +18,9 @@ interface UseOnlineGameSyncOptions {
   enabled: boolean
 }
 
+const ROOM_WAIT_MS = 80
+const ROOM_WAIT_ATTEMPTS = 25
+
 export function useOnlineGameSync({ config, enabled }: UseOnlineGameSyncOptions) {
   const online = config.online
   const [room, setRoom] = useState<OnlineRoomRow | null>(null)
@@ -25,8 +29,28 @@ export function useOnlineGameSync({ config, enabled }: UseOnlineGameSyncOptions)
   const applyingRemote = useRef(false)
   const lastAppliedVersion = useRef(-1)
   const hasAbandonedRef = useRef(false)
+  const roomRef = useRef<OnlineRoomRow | null>(null)
 
   const isOnline = enabled && !!online
+
+  const syncRoom = useCallback((next: OnlineRoomRow | null) => {
+    roomRef.current = next
+    setRoom(next)
+  }, [])
+
+  const waitForRoom = useCallback(async (): Promise<OnlineRoomRow | null> => {
+    if (roomRef.current) return roomRef.current
+    if (!online?.roomId) return null
+    for (let i = 0; i < ROOM_WAIT_ATTEMPTS; i++) {
+      const fetched = await fetchOnlineRoom(online.roomId)
+      if (fetched) {
+        syncRoom(fetched)
+        return fetched
+      }
+      await new Promise((r) => setTimeout(r, ROOM_WAIT_MS))
+    }
+    return roomRef.current
+  }, [online?.roomId, syncRoom])
 
   const leaveRoom = useCallback(async (): Promise<boolean> => {
     if (!online?.roomId || hasAbandonedRef.current) return false
@@ -45,11 +69,12 @@ export function useOnlineGameSync({ config, enabled }: UseOnlineGameSyncOptions)
     lastAppliedVersion.current = -1
     hasAbandonedRef.current = false
     setOpponentLeft(false)
+    syncRoom(null)
 
     const unsub = subscribeToRoom(online.roomId, {
-      onRoom: (next) => setRoom(next),
+      onRoom: (next) => syncRoom(next),
       onDeleted: () => {
-        setRoom(null)
+        syncRoom(null)
         if (!hasAbandonedRef.current) setOpponentLeft(true)
       },
     })
@@ -63,7 +88,7 @@ export function useOnlineGameSync({ config, enabled }: UseOnlineGameSyncOptions)
       window.removeEventListener('pagehide', onPageHide)
       unsub()
     }
-  }, [isOnline, online?.roomId, leaveRoom])
+  }, [isOnline, online?.roomId, leaveRoom, syncRoom])
 
   const isMyTurn = isOnline && room ? room.turn === config.playerColor : true
 
@@ -77,14 +102,17 @@ export function useOnlineGameSync({ config, enabled }: UseOnlineGameSyncOptions)
 
   const pushClassicState = useCallback(
     async (fen: string, turn: PieceColor, lastMove?: { from: string; to: string } | null) => {
-      if (!online || !room || applyingRemote.current) return false
+      if (!online?.roomId || applyingRemote.current) return false
+      const active = await waitForRoom()
+      if (!active) {
+        setSyncError('ROOM_NOT_READY')
+        return false
+      }
       const state: ClassicRoomState = { type: 'classic', fen, lastMove: lastMove ?? null }
       try {
-        const updated = await pushRoomState(room.id, room.version, {
-          state,
-          turn,
-        })
-        setRoom(updated)
+        const updated = await pushRoomStateWithRetry(active.id, { state, turn })
+        syncRoom(updated)
+        lastAppliedVersion.current = updated.version
         setSyncError(null)
         return true
       } catch (e) {
@@ -92,20 +120,26 @@ export function useOnlineGameSync({ config, enabled }: UseOnlineGameSyncOptions)
         return false
       }
     },
-    [online, room],
+    [online?.roomId, syncRoom, waitForRoom],
   )
 
   const pushQuantumState = useCallback(
     async (qstate: QState, turn: PieceColor) => {
-      if (!online || !room || applyingRemote.current) return false
+      if (!online?.roomId || applyingRemote.current) return false
+      const active = await waitForRoom()
+      if (!active) {
+        setSyncError('ROOM_NOT_READY')
+        return false
+      }
       const state: QuantumRoomState = { type: 'quantum', qstate }
       try {
-        const updated = await pushRoomState(room.id, room.version, {
+        const updated = await pushRoomStateWithRetry(active.id, {
           state,
           turn,
-          measurement_seed: room.measurement_seed,
+          measurement_seed: active.measurement_seed,
         })
-        setRoom(updated)
+        syncRoom(updated)
+        lastAppliedVersion.current = updated.version
         setSyncError(null)
         return true
       } catch (e) {
@@ -113,7 +147,7 @@ export function useOnlineGameSync({ config, enabled }: UseOnlineGameSyncOptions)
         return false
       }
     },
-    [online, room],
+    [online?.roomId, syncRoom, waitForRoom],
   )
 
   const finishGame = useCallback(async () => {

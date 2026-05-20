@@ -72,7 +72,10 @@ export default function QuantumGameScreen({
     [config.opponentMode, onlineSync],
   )
 
-  const game = useQuantumChess(config, sounds, language, { onStateChange })
+  const game = useQuantumChess(config, sounds, language, {
+    onStateChange,
+    canMove: () => config.opponentMode !== 'online' || onlineSync.isMyTurn,
+  })
   const isOnline = game.isOnline
   const reduceMotion = useReducedMotion()
   const [boardReady, setBoardReady] = useState(false)
@@ -109,8 +112,15 @@ export default function QuantumGameScreen({
     if (!onlineSync.shouldApplyRemote || !onlineSync.remoteState) return
     if (onlineSync.remoteState.type !== 'quantum') return
 
+    const remote = onlineSync.remoteState.qstate
+    const local = game.exportState()
+    if (JSON.stringify(local) === JSON.stringify(remote)) {
+      onlineSync.markRemoteApplied(onlineSync.remoteVersion)
+      return
+    }
+
     onlineSync.beginRemoteApply()
-    game.loadQuantumState(onlineSync.remoteState.qstate)
+    game.loadQuantumState(remote)
     onlineSync.markRemoteApplied(onlineSync.remoteVersion)
     onlineSync.endRemoteApply()
     // eslint-disable-next-line react-hooks/exhaustive-deps

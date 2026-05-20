@@ -52,6 +52,7 @@ function qGameOverToClassic(qgo: QGameOver, playerColor: PieceColor, language: L
 
 export interface UseQuantumChessOptions {
   onStateChange?: (engine: QuantumChessEngine) => void
+  canMove?: () => boolean
 }
 
 export function useQuantumChess(
@@ -75,6 +76,8 @@ export function useQuantumChess(
   } | null>(null)
 
   const isOnline = config.opponentMode === 'online'
+  const canMoveRef = useRef(options.canMove)
+  canMoveRef.current = options.canMove
   const engine = engineRef.current
   const state = engine.state
 
@@ -206,7 +209,7 @@ export function useQuantumChess(
 
   const handleSquareClick = useCallback((sq: string) => {
     if (gameOverInfo) return
-    if (isOnline && state.turn !== config.playerColor) return
+    if (isOnline && (canMoveRef.current ? !canMoveRef.current() : state.turn !== config.playerColor)) return
     const allowedColor = state.turn
 
     const cellsOnSquare = board[sq] || []
@@ -294,7 +297,7 @@ export function useQuantumChess(
 
   const handleDrop = useCallback((from: string, to: string) => {
     if (gameOverInfo) return
-    if (isOnline && state.turn !== config.playerColor) return
+    if (isOnline && (canMoveRef.current ? !canMoveRef.current() : state.turn !== config.playerColor)) return
     if (moveMode !== 'classical') return
     const allowedColor = state.turn
 
@@ -343,7 +346,7 @@ export function useQuantumChess(
 
   const doQuantumCastle = useCallback((side: 'k' | 'q') => {
     if (gameOverInfo) return
-    if (isOnline && state.turn !== config.playerColor) return
+    if (isOnline && (canMoveRef.current ? !canMoveRef.current() : state.turn !== config.playerColor)) return
     const allowedColor = state.turn
 
     engine.doQuantumCastle(allowedColor, side)
@@ -355,7 +358,7 @@ export function useQuantumChess(
 
   const doClassicalCastle = useCallback((side: 'k' | 'q') => {
     if (gameOverInfo) return
-    if (isOnline && state.turn !== config.playerColor) return
+    if (isOnline && (canMoveRef.current ? !canMoveRef.current() : state.turn !== config.playerColor)) return
 
     const allowedColor = state.turn
     const rank = allowedColor === 'w' ? '1' : '8'
@@ -435,6 +438,7 @@ export function useQuantumChess(
     resign,
     handleTimedOut,
     dismissGameOver,
+    exportState: () => engine.exportState(),
     dismissMeasurement,
     playerColor: config.playerColor,
     controlColor: isOnline ? config.playerColor : turn,
