@@ -10,6 +10,7 @@ import MusicPlayer from './MusicPlayer'
 import PromotionModal from './PromotionModal'
 import GameOverModal from './GameOverModal'
 import OnlineSessionEndedModal from './OnlineSessionEndedModal'
+import { OnlineBetaBadge } from './OnlineBetaNotice'
 import QuantumMeasurementRoulette from './QuantumMeasurementRoulette'
 import { useQuantumChess } from '../hooks/useQuantumChess'
 import { useOnlineGameSync } from '../hooks/useOnlineGameSync'
@@ -294,10 +295,11 @@ export default function QuantumGameScreen({
         <div className="flex items-center gap-3">
           <span className="font-serif text-lg text-indigo-400">⚛</span>
           <span className="hidden font-serif text-sm text-white sm:inline">GdD</span>
-          <span className="text-ui-xs font-medium uppercase tracking-wider text-neutral-500">
+          <span className="flex flex-wrap items-center gap-2 text-ui-xs font-medium uppercase tracking-wider text-neutral-500">
             {isOnline
               ? `${t.onlineBadge}${config.online?.code ? ` · ${config.online.code}` : ''}`
               : t.quantumBadge}
+            {isOnline && <OnlineBetaBadge language={language} />}
           </span>
         </div>
         <div className="flex items-center gap-1">

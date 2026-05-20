@@ -2,8 +2,9 @@ import { useState, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { DIFFICULTIES, TIMER_OPTIONS } from '../lib/constants'
 import { checkHealth } from '../lib/api'
-import { getDifficultyLabel } from '../lib/i18n'
+import { getDifficultyLabel, ui } from '../lib/i18n'
 import type { GameConfig, GameMode, OpponentMode, PieceColor, Difficulty, Language, PlayerColorChoice } from '../lib/types'
+import OnlineBetaNotice, { OnlineBetaBadge } from './OnlineBetaNotice'
 
 interface StartMenuProps {
   onPlay: (config: GameConfig) => void
@@ -39,6 +40,7 @@ export default function StartMenu({
   const isOnlineMode = opponentMode === 'online'
   const canPlay = isOnlineMode ? true : requiresEngine ? serverReady : true
   const isQuantum = gameMode === 'quantum'
+  const tu = ui(language)
 
   const t = language === 'es'
     ? {
@@ -269,36 +271,43 @@ export default function StartMenu({
                 <Label>{t.opponent}</Label>
                 <div className="flex overflow-hidden rounded border border-surface-4">
                   {([
-                    { value: 'ai' as OpponentMode, label: t.vsAi },
-                    { value: 'local' as OpponentMode, label: t.twoPlayers },
-                    { value: 'online' as OpponentMode, label: t.online },
+                    { value: 'ai' as OpponentMode, label: t.vsAi, beta: false },
+                    { value: 'local' as OpponentMode, label: t.twoPlayers, beta: false },
+                    { value: 'online' as OpponentMode, label: t.online, beta: true },
                   ] as const).map((opt, i) => (
                     <button
                       key={opt.value}
                       onClick={() => setOpponentMode(opt.value)}
-                      className={`flex-1 py-3 text-center text-ui-sm font-semibold transition-colors
+                      className={`flex flex-1 flex-col items-center justify-center gap-0.5 py-2.5 text-center text-ui-sm font-semibold transition-colors
                         ${i > 0 ? 'border-l border-surface-4' : ''}
                         ${opponentMode === opt.value
                           ? 'bg-accent/10 text-accent'
                           : 'bg-transparent text-neutral-500 hover:bg-surface-2 hover:text-neutral-300'
                         }`}
                     >
-                      {opt.label}
+                      <span>{opt.label}</span>
+                      {opt.beta && <OnlineBetaBadge language={language} className="scale-90" />}
                     </button>
                   ))}
                 </div>
+                {opponentMode === 'online' && (
+                  <div className="mt-3">
+                    <OnlineBetaNotice language={language} variant="compact" />
+                  </div>
+                )}
               </motion.div>
             ) : (
               <motion.div className="mb-7 space-y-3" custom={2} variants={stagger} initial="hidden" animate="show">
                 <p className="rounded border border-indigo-500/20 bg-indigo-500/5 px-4 py-3 text-ui-sm text-indigo-300">
                   ⚛ {t.quantumInfo}
                 </p>
+                <OnlineBetaNotice language={language} variant="compact" />
                 <button
                   type="button"
                   onClick={openOnlineLobby}
-                  className="w-full rounded border border-indigo-400/40 py-3 text-ui-sm font-semibold text-indigo-300 hover:bg-indigo-500/10"
+                  className="flex w-full items-center justify-center gap-2 rounded border border-indigo-400/40 py-3 text-ui-sm font-semibold text-indigo-300 hover:bg-indigo-500/10"
                 >
-                  🌐 {t.playOnline}
+                  <span>🌐 {tu.onlineBetaTitle}</span>
                 </button>
               </motion.div>
             )}
@@ -390,6 +399,12 @@ export default function StartMenu({
 
             <div className="rule mb-8" />
 
+            {isOnlineMode && (
+              <motion.div className="mb-4" custom={4.5} variants={stagger} initial="hidden" animate="show">
+                <OnlineBetaNotice language={language} variant="compact" />
+              </motion.div>
+            )}
+
             {/* Play button */}
             <motion.div custom={5} variants={stagger} initial="hidden" animate="show">
               <button
@@ -405,7 +420,7 @@ export default function StartMenu({
               >
                 {canPlay
                   ? isOnlineMode
-                    ? `🌐  ${t.playOnline}`
+                    ? `🌐  ${tu.onlineBetaTitle}`
                     : isQuantum
                       ? `⚛  ${t.playLocal}`
                       : `▸  ${t.playClassic}`

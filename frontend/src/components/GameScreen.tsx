@@ -10,6 +10,7 @@ import MusicPlayer from './MusicPlayer'
 import PromotionModal from './PromotionModal'
 import GameOverModal from './GameOverModal'
 import OnlineSessionEndedModal from './OnlineSessionEndedModal'
+import { OnlineBetaBadge } from './OnlineBetaNotice'
 import { useChessGame } from '../hooks/useChessGame'
 import { useOnlineGameSync } from '../hooks/useOnlineGameSync'
 import { useSoundFX } from '../hooks/useSoundFX'
@@ -210,8 +211,9 @@ export default function GameScreen({
         <div className="flex items-center gap-3">
           <span className="font-serif text-lg text-accent">♛</span>
           <span className="hidden font-serif text-sm text-white sm:inline">GdD</span>
-          <span className="text-ui-xs font-medium uppercase tracking-wider text-neutral-500">
+          <span className="flex flex-wrap items-center gap-2 text-ui-xs font-medium uppercase tracking-wider text-neutral-500">
             {modeBadge}
+            {isOnline && <OnlineBetaBadge language={language} />}
           </span>
         </div>
         <div className="flex items-center gap-1">

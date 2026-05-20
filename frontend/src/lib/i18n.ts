@@ -275,6 +275,10 @@ export const UI_STRINGS = {
     onlineNotConfiguredHint:
       'Añade VITE_SUPABASE_URL y VITE_SUPABASE_ANON_KEY (ver frontend/.env.example y supabase/migrations).',
     onlineBadge: 'En línea · 2 jugadores',
+    onlineBetaBadge: 'Beta',
+    onlineBetaNotice:
+      'El multijugador en línea está en fase beta. Pueden aparecer desincronizaciones o cortes; estamos mejorándolo.',
+    onlineBetaTitle: 'Multijugador en línea (beta)',
     onlineOpponentLeftTitle: 'Partida cerrada',
     onlineOpponentLeftMessage: 'Tu rival ha abandonado la partida o se ha desconectado.',
     gameMode: 'Modo de juego',
@@ -366,6 +370,10 @@ export const UI_STRINGS = {
     onlineNotConfiguredHint:
       'Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY (see frontend/.env.example and supabase/migrations).',
     onlineBadge: 'Online · 2 players',
+    onlineBetaBadge: 'Beta',
+    onlineBetaNotice:
+      'Online multiplayer is in beta. You may see sync issues or disconnects; we are actively improving it.',
+    onlineBetaTitle: 'Online multiplayer (beta)',
     onlineOpponentLeftTitle: 'Game closed',
     onlineOpponentLeftMessage: 'Your opponent left the game or disconnected.',
     gameMode: 'Game mode',
