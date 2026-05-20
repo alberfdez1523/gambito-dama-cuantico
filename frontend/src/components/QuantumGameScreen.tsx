@@ -18,7 +18,8 @@ import { useAmbientMusic } from '../hooks/useAmbientMusic'
 import { useTimer } from '../hooks/useTimer'
 import { getPlayerLabel, ui } from '../lib/i18n'
 import type { AppSettings } from '../lib/settings'
-import type { GameConfig, Language, PieceColor, QMoveMode } from '../lib/types'
+import { quantumStateFingerprint } from '../lib/onlineTypes'
+import type { GameConfig, Language, PieceColor, QMoveMode, QState } from '../lib/types'
 
 interface QuantumGameScreenProps {
   config: GameConfig
@@ -63,7 +64,9 @@ export default function QuantumGameScreen({
     return () => window.clearTimeout(id)
   }, [onlineSync.opponentLeft, handleLeaveToMenu])
 
-  const loadQuantumRef = useRef<(q: import('../lib/types').QState) => void>(() => {})
+  const loadQuantumRef = useRef<(q: QState) => void>(() => {})
+  const turnRef = useRef<PieceColor>('w')
+  const exportQStateRef = useRef<() => QState>(() => ({} as QState))
 
   const onStateChange = useCallback(
     (engine: import('../lib/quantumEngine').QuantumChessEngine) => {
@@ -82,13 +85,12 @@ export default function QuantumGameScreen({
     onStateChange,
     canMove: () => {
       if (config.opponentMode !== 'online') return true
-      if (!onlineSync.isMyTurn) return false
-      const remote = onlineSync.remoteState
-      if (remote?.type !== 'quantum') return false
-      return JSON.stringify(game.exportState()) === JSON.stringify(remote.qstate)
+      return onlineSync.canPlayQuantumMove(turnRef.current, exportQStateRef.current())
     },
   })
   loadQuantumRef.current = game.loadQuantumState
+  turnRef.current = game.turn
+  exportQStateRef.current = game.exportState
   const isOnline = game.isOnline
   const reduceMotion = useReducedMotion()
   const [boardReady, setBoardReady] = useState(false)
@@ -127,7 +129,7 @@ export default function QuantumGameScreen({
 
     const remote = onlineSync.remoteState.qstate
     const local = game.exportState()
-    if (JSON.stringify(local) === JSON.stringify(remote)) {
+    if (quantumStateFingerprint(local) === quantumStateFingerprint(remote)) {
       onlineSync.markRemoteApplied(onlineSync.remoteVersion)
       return
     }
@@ -138,6 +140,21 @@ export default function QuantumGameScreen({
     onlineSync.endRemoteApply()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [onlineSync.remoteVersion])
+
+  useEffect(() => {
+    if (config.opponentMode !== 'online') return
+    if (onlineSync.syncError !== 'CONFLICT' && onlineSync.syncError !== 'OUT_OF_SYNC') return
+    const remote = onlineSync.remoteState
+    if (remote?.type !== 'quantum') return
+    const local = game.exportState()
+    if (quantumStateFingerprint(local) === quantumStateFingerprint(remote.qstate)) return
+
+    onlineSync.beginRemoteApply()
+    game.loadQuantumState(remote.qstate)
+    onlineSync.markRemoteApplied(onlineSync.remoteVersion)
+    onlineSync.endRemoteApply()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [onlineSync.syncError, onlineSync.remoteVersion])
 
   useEffect(() => {
     if (game.gameOverInfo && config.opponentMode === 'online') {

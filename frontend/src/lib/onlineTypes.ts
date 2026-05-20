@@ -17,6 +17,13 @@ export interface QuantumRoomState {
 
 export type RoomGameState = ClassicRoomState | QuantumRoomState
 
+/** Huella ligera para comparar estado cuántico sin JSON completo (evita falsos desajustes). */
+export function quantumStateFingerprint(q: QState): string {
+  const last = q.history[q.history.length - 1]
+  const lastKey = last ? `${last.from}-${last.to}-${last.pieceType}` : ''
+  return `${q.turn}|${q.moveNumber}|${q.history.length}|${lastKey}|${q.gameOver?.winner ?? ''}`
+}
+
 export interface OnlineRoomRow {
   id: string
   code: string

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Chess } from 'chess.js'
 import type { GameConfig, PieceColor } from '../lib/types'
 import type { ClassicRoomState, OnlineRoomRow, QuantumRoomState } from '../lib/onlineTypes'
+import { quantumStateFingerprint } from '../lib/onlineTypes'
 import type { OnlineMeta } from '../lib/types'
 import {
   abandonOnlineRoom,
@@ -124,6 +125,23 @@ export function useOnlineGameSync({ config, enabled }: UseOnlineGameSyncOptions)
     [isMyTurn, isBoardInSync],
   )
 
+  const isQuantumSynced = useCallback(
+    (local: QState) => {
+      if (!isOnline || !room || room.state.type !== 'quantum') return true
+      return quantumStateFingerprint(local) === quantumStateFingerprint(room.state.qstate)
+    },
+    [isOnline, room],
+  )
+
+  const canPlayQuantumMove = useCallback(
+    (localTurn: PieceColor, local: QState) => {
+      if (!isOnline) return true
+      if (!isMyTurn || localTurn !== config.playerColor) return false
+      return isQuantumSynced(local)
+    },
+    [isOnline, isMyTurn, config.playerColor, isQuantumSynced],
+  )
+
   const opponentConnected = isOnline && room
     ? Boolean(
         room.white_player_id &&
@@ -191,10 +209,21 @@ export function useOnlineGameSync({ config, enabled }: UseOnlineGameSyncOptions)
         return false
       }
 
-      const serverState = active.state
-      if (serverState.type === 'quantum' && JSON.stringify(serverState.qstate) === JSON.stringify(qstate)) {
+      if (active.state.type !== 'quantum') {
+        setSyncError('ROOM_NOT_READY')
+        return false
+      }
+
+      const serverQ = active.state.qstate
+      if (quantumStateFingerprint(serverQ) === quantumStateFingerprint(qstate)) {
         setSyncError(null)
         return true
+      }
+
+      if (active.turn !== config.playerColor) {
+        await refreshRoomFromServer()
+        setSyncError('OUT_OF_SYNC')
+        return false
       }
 
       const state: QuantumRoomState = { type: 'quantum', qstate }
@@ -222,7 +251,7 @@ export function useOnlineGameSync({ config, enabled }: UseOnlineGameSyncOptions)
         pushingRef.current = false
       }
     },
-    [online?.roomId, refreshRoomFromServer, syncRoom, waitForRoom],
+    [online?.roomId, config.playerColor, refreshRoomFromServer, syncRoom, waitForRoom],
   )
 
   const finishGame = useCallback(async () => {
@@ -269,6 +298,8 @@ export function useOnlineGameSync({ config, enabled }: UseOnlineGameSyncOptions)
     isMyTurn,
     isBoardInSync,
     canPlayMove,
+    isQuantumSynced,
+    canPlayQuantumMove,
     opponentConnected,
     opponentLeft,
     syncError,
