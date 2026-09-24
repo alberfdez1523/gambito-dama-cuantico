@@ -26,7 +26,7 @@ import {
   quantumRoomFingerprint,
   quantumStateFingerprint,
 } from '../lib/onlineTypes'
-import type { GameConfig, GameResult, Language, PieceColor, QMoveMode, QState } from '../lib/types'
+import type { GameConfig, GameResult, Language, PieceColor, PieceType, QMoveMode, QState } from '../lib/types'
 import type { GameChromeModel, GameNotice, GameTone } from '../lib/gamePresentation'
 import { gameAutosave, type GameAutosave } from '../lib/gameAutosave'
 import { createSeededQuantumRng } from '../lib/quantumEngine'
@@ -369,7 +369,7 @@ export default function QuantumGameScreen({
     isActive: game.turn === topColor && !game.gameOver,
     turnLabel: game.turn === topColor && !game.gameOver ? (language === 'es' ? 'Mueve' : 'To move') : undefined,
     accent: 'quantum' as const,
-    captures: [] as any[],
+    captures: [] as PieceType[],
     materialDiff: 0,
     time: config.useTimer ? (topColor === 'w' ? timer.whiteTime : timer.blackTime) : null,
     isLow: config.useTimer ? (topColor === 'w' ? timer.whiteTime : timer.blackTime) < 60 : false,
@@ -387,7 +387,7 @@ export default function QuantumGameScreen({
     isActive: game.turn === bottomColor && !game.gameOver,
     turnLabel: game.turn === bottomColor && !game.gameOver ? (language === 'es' ? 'Mueve' : 'To move') : undefined,
     accent: 'quantum' as const,
-    captures: [] as any[],
+    captures: [] as PieceType[],
     materialDiff: 0,
     time: config.useTimer ? (bottomColor === 'w' ? timer.whiteTime : timer.blackTime) : null,
     isLow: config.useTimer ? (bottomColor === 'w' ? timer.whiteTime : timer.blackTime) < 60 : false,

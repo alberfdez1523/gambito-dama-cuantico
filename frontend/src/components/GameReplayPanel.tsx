@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type CSSProperties } from 'react'
-import { Chess } from 'chess.js'
+import { Chess, type Square } from 'chess.js'
 import { motion, useReducedMotion } from 'framer-motion'
 import type {
   CoherenceLimit,
@@ -377,7 +377,7 @@ function ClassicReplayBoard({ frame, language, flipped }: { frame?: ClassicFrame
   const turn = game.turn() as PieceColor
   const passiveColor: PieceColor = turn === 'w' ? 'b' : 'w'
   const getPiece = (square: string) => {
-    const piece = game.get(square)
+    const piece = game.get(square as Square)
     return piece ? { type: piece.type as PieceType, color: piece.color as PieceColor } : null
   }
   return (

@@ -1,4 +1,5 @@
 import { Chess } from 'chess.js'
+import { tryMove } from './chessRules'
 import type { GameConfig, GameMode, GameResult, PieceColor } from './types'
 import { hashClassicState, type ClassicRoomState, type OnlineRoomRow, type QuantumRoomState, type RoomGameState } from './onlineTypes'
 import { getSupabase } from './supabase'
@@ -125,8 +126,8 @@ export function initialQuantumState(): QuantumRoomState {
 export function classicResultFromFen(fen: string): GameResult | null {
   try {
     const game = new Chess(fen)
-    if (!game.game_over()) return null
-    if (game.in_checkmate()) {
+    if (!game.isGameOver()) return null
+    if (game.isCheckmate()) {
       return { winner: game.turn() === 'w' ? 'b' : 'w', cause: 'checkmate' }
     }
     return { winner: null, cause: 'draw' }
@@ -273,10 +274,10 @@ export function isLegalMoveFromFen(
   for (const promotion of promotions) {
     try {
       const game = new Chess(baseFen)
-      const result = game.move({ from: lastMove.from, to: lastMove.to, promotion })
+      const result = tryMove(game, { from: lastMove.from, to: lastMove.to, promotion })
       if (result && game.fen() === targetFen) return true
     } catch {
-      /* siguiente promoción */
+      /* FEN base inválido */
     }
   }
   return false
