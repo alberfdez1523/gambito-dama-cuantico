@@ -16,10 +16,11 @@ import { useOnlineGameSync } from '../hooks/useOnlineGameSync'
 import { useSoundFX } from '../hooks/useSoundFX'
 import { useAmbientMusic } from '../hooks/useAmbientMusic'
 import { useTimer } from '../hooks/useTimer'
+import { usePlayerLabel } from '../hooks/usePlayerLabel'
 import { DIFFICULTIES } from '../lib/constants'
-import { getDifficultyLabel, getPlayerLabel, ui } from '../lib/i18n'
+import { getDifficultyLabel, ui } from '../lib/i18n'
 import type { AppSettings } from '../lib/settings'
-import type { GameConfig, GameResult, Language, PieceColor } from '../lib/types'
+import type { GameConfig, GameResult, Language } from '../lib/types'
 import type { GameChromeModel, GameNotice, GameTone } from '../lib/gamePresentation'
 import { gameAutosave, type GameAutosave } from '../lib/gameAutosave'
 import { classicResultFromFen } from '../lib/onlineRoom'
@@ -266,11 +267,13 @@ export default function GameScreen({
   const topColor = game.boardFlipped ? config.playerColor : opponentColor
   const bottomColor = game.boardFlipped ? opponentColor : config.playerColor
 
-  const labelForColor = useCallback((c: PieceColor) => {
-    if (isAIMode) return c === config.playerColor ? t.you : 'Stockfish'
-    if (isOnline) return c === config.playerColor ? t.you : (ui(language).opponent)
-    return getPlayerLabel(c, language)
-  }, [config.playerColor, isAIMode, isOnline, language, t.you])
+  const labelForColor = usePlayerLabel({
+    playerColor: config.playerColor,
+    language,
+    isAIMode,
+    isOnline,
+    aiName: 'Stockfish',
+  })
 
   const topBar = useMemo(() => {
     const isAI = isAIMode && topColor !== config.playerColor

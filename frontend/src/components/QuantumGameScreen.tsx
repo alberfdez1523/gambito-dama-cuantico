@@ -19,7 +19,8 @@ import { useOnlineGameSync } from '../hooks/useOnlineGameSync'
 import { useSoundFX } from '../hooks/useSoundFX'
 import { useAmbientMusic } from '../hooks/useAmbientMusic'
 import { useTimer } from '../hooks/useTimer'
-import { getPlayerLabel, ui } from '../lib/i18n'
+import { usePlayerLabel } from '../hooks/usePlayerLabel'
+import { ui } from '../lib/i18n'
 import type { AppSettings } from '../lib/settings'
 import {
   onlineResultToGameOverInfo,
@@ -345,11 +346,13 @@ export default function QuantumGameScreen({
   const topColor: PieceColor = game.boardFlipped ? config.playerColor : opponentColor
   const bottomColor: PieceColor = game.boardFlipped ? opponentColor : config.playerColor
 
-  const labelForColor = useCallback((c: PieceColor) => {
-    if (isOnline) return c === config.playerColor ? t.you : (ui(language).opponent)
-    if (isAIMode) return c === config.playerColor ? t.you : (ui(language).quantumAi)
-    return getPlayerLabel(c, language)
-  }, [config.playerColor, isAIMode, isOnline, language, t.you])
+  const labelForColor = usePlayerLabel({
+    playerColor: config.playerColor,
+    language,
+    isAIMode,
+    isOnline,
+    aiName: ui(language).quantumAi,
+  })
 
   const classicHistory = useMemo(() => {
     return game.history.map((m) => ({
