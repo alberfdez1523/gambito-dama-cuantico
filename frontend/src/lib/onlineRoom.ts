@@ -65,16 +65,29 @@ async function logRoomMove(
   }
 }
 
-function generateRoomCode(): string {
+/** Entero uniforme en [0, max) con CSPRNG y sin sesgo de módulo. */
+function secureRandomInt(max: number): number {
+  const limit = Math.floor(0x1_0000_0000 / max) * max
+  const buffer = new Uint32Array(1)
+  do {
+    crypto.getRandomValues(buffer)
+  } while (buffer[0] >= limit)
+  return buffer[0] % max
+}
+
+export function generateRoomCode(): string {
   let code = ''
   for (let i = 0; i < 6; i++) {
-    code += CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)]
+    code += CODE_CHARS[secureRandomInt(CODE_CHARS.length)]
   }
   return code
 }
 
-function randomSeed(): string {
-  return `${Date.now()}-${Math.random().toString(36).slice(2, 12)}`
+/** Semilla provisional: la migración 202609240001 la sustituye por una generada en BD. */
+export function randomSeed(): string {
+  const bytes = new Uint8Array(16)
+  crypto.getRandomValues(bytes)
+  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('')
 }
 
 export function initialClassicState(): ClassicRoomState {
@@ -170,70 +183,24 @@ export async function createOnlineRoom(
   throw new Error('No se pudo generar un código único')
 }
 
+const JOIN_ERROR_CODES = ['ROOM_NOT_FOUND', 'ROOM_FINISHED', 'ROOM_FULL'] as const
+
+/**
+ * Se une a una sala por código mediante la RPC `join_room_by_code`: las salas en
+ * espera no son legibles para quien no participa, así que no se pueden enumerar.
+ */
 export async function joinOnlineRoom(code: string): Promise<OnlineRoomRow> {
   const supabase = getSupabase()
-  const userId = await ensureOnlineAuth()
+  await ensureOnlineAuth()
   const normalized = code.trim().toUpperCase().replace(/\s/g, '')
 
-  const { data: room, error } = await supabase
-    .from('rooms')
-    .select('*')
-    .eq('code', normalized)
-    .maybeSingle()
-
-  if (error) throw new Error(error.message)
-  if (!room) throw new Error('ROOM_NOT_FOUND')
-  if (room.status === 'finished') throw new Error('ROOM_FINISHED')
-
-  const r = room as OnlineRoomRow
-  if (r.white_player_id === userId || r.black_player_id === userId) {
-    const missingColor: PieceColor | null = !r.white_player_id ? 'w' : !r.black_player_id ? 'b' : null
-    const currentColor: PieceColor = r.white_player_id === userId ? 'w' : 'b'
-
-    if (r.status === 'waiting' && missingColor) {
-      const { data: updated, error: upErr } = await supabase
-        .from('rooms')
-        .update({
-          [missingColor === 'w' ? 'white_player_id' : 'black_player_id']: userId,
-          status: 'playing',
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', r.id)
-        .eq('version', r.version)
-        .select()
-        .single()
-
-      if (upErr || !updated) throw new Error(upErr?.message ?? 'No se pudo unir a la sala')
-      return { ...(updated as OnlineRoomRow), client_color: missingColor }
-    }
-
-    return { ...r, client_color: currentColor }
+  const { data, error } = await supabase.rpc('join_room_by_code', { p_code: normalized })
+  if (error) {
+    const known = JOIN_ERROR_CODES.find((known) => error.message.includes(known))
+    throw new Error(known ?? error.message)
   }
-
-  if (r.status !== 'waiting') {
-    throw new Error('ROOM_FULL')
-  }
-
-  const patch: Partial<OnlineRoomRow> = {}
-  if (!r.white_player_id) patch.white_player_id = userId
-  else if (!r.black_player_id) patch.black_player_id = userId
-  else throw new Error('ROOM_FULL')
-
-  const { data: updated, error: upErr } = await supabase
-    .from('rooms')
-    .update({
-      ...patch,
-      status: 'playing',
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', r.id)
-    .eq('version', r.version)
-    .select()
-    .single()
-
-  if (upErr || !updated) throw new Error(upErr?.message ?? 'No se pudo unir a la sala')
-  const joinedColor = patch.white_player_id ? 'w' : 'b'
-  return { ...(updated as OnlineRoomRow), client_color: joinedColor }
+  if (!data) throw new Error('ROOM_NOT_FOUND')
+  return data as OnlineRoomRow
 }
 
 export async function startOnlineRoom(roomId: string): Promise<OnlineRoomRow> {

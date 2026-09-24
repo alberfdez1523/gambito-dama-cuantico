@@ -70,7 +70,8 @@ export default defineConfig({
   ],
   test: {
     environment: 'node',
-    include: ['src/**/*.test.ts'],
+    include: ['src/**/*.test.ts', 'db-tests/**/*.test.ts'],
+    testTimeout: 30_000,
   },
   server: {
     port: 5173,
