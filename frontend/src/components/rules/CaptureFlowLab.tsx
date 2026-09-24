@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { m, AnimatePresence } from 'framer-motion'
 import type { CaptureScenario } from './types'
 import MiniBoard from './MiniBoard'
 import { useMiniSqPx } from './useMiniSqPx'
@@ -36,7 +36,7 @@ export default function CaptureFlowLab({ scenarios, es }: CaptureFlowLabProps) {
           : 'Pick a capture type and step through what gets measured and what happens.'}
       </p>
 
-      <motion.div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+      <m.div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         {scenarios.map((s) => (
           <button
             key={s.id}
@@ -53,10 +53,10 @@ export default function CaptureFlowLab({ scenarios, es }: CaptureFlowLabProps) {
             <span className="mt-1 text-ui-sm font-semibold text-white">{s.label}</span>
           </button>
         ))}
-      </motion.div>
+      </m.div>
 
       <AnimatePresence mode="wait">
-        <motion.div
+        <m.div
           key={active.id}
           className="mt-6 rounded-lg border border-indigo-500/20 bg-indigo-500/5 p-5"
           initial={{ opacity: 0, y: 10 }}
@@ -120,7 +120,7 @@ export default function CaptureFlowLab({ scenarios, es }: CaptureFlowLabProps) {
               )}
             </div>
           </div>
-        </motion.div>
+        </m.div>
       </AnimatePresence>
     </section>
   )

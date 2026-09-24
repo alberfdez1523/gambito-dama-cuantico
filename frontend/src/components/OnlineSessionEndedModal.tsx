@@ -1,4 +1,4 @@
-import { motion, AnimatePresence } from 'framer-motion'
+import { m, AnimatePresence } from 'framer-motion'
 import { useReducedMotion } from 'framer-motion'
 import { ui } from '../lib/i18n'
 import { useModalA11y } from '../hooks/useModalA11y'
@@ -26,14 +26,14 @@ export default function OnlineSessionEndedModal({
   return (
     <AnimatePresence>
       {visible && (
-        <motion.div
+        <m.div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           role="presentation"
         >
-          <motion.div
+          <m.div
             ref={containerRef}
             role="dialog"
             aria-modal="true"
@@ -57,7 +57,7 @@ export default function OnlineSessionEndedModal({
               className="inline-flex min-h-11 w-full items-center justify-center gap-2 border border-quantum bg-quantum/10 py-3 text-ui-sm font-semibold text-quantum"
             >
               <GameIcon name="retry" />
-              {language === 'es' ? 'Intentar reconectar' : 'Try reconnecting'}
+              {ui(language).tryReconnecting}
             </button>
             <button
               type="button"
@@ -66,8 +66,8 @@ export default function OnlineSessionEndedModal({
             >
               {t.menu}
             </button>
-          </motion.div>
-        </motion.div>
+          </m.div>
+        </m.div>
       )}
     </AnimatePresence>
   )

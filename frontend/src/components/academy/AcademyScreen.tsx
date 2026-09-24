@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { motion, useReducedMotion } from 'framer-motion'
+import { m, useReducedMotion } from 'framer-motion'
 import type { AcademyProgressController } from '../../hooks/useAcademyProgress'
 import {
   ACADEMY_LESSON_BY_ID,
@@ -19,6 +19,7 @@ import type { Language } from '../../lib/types'
 import { FEATURES } from '../../lib/featureFlags'
 import GameIcon from '../GameIcon'
 import QuantumLogo from '../QuantumLogo'
+import { ui } from '../../lib/i18n'
 
 interface AcademyScreenProps {
   language: Language
@@ -121,7 +122,7 @@ export default function AcademyScreen({
           </div>
         </section>
 
-        <section className="mt-8" aria-label={language === 'es' ? 'Selector de ruta' : 'Route selector'}>
+        <section className="mt-8" aria-label={ui(language).routeSelector}>
           <div className="grid max-w-xl grid-cols-2 border border-line bg-line" role="radiogroup">
             {(['classic', 'quantum'] as CourseId[]).map((candidate) => (
               <button
@@ -154,7 +155,7 @@ export default function AcademyScreen({
               </span>
             </div>
             <div className="mt-5 h-1.5 overflow-hidden bg-surface-3" aria-hidden="true">
-              <motion.div
+              <m.div
                 className={course === 'quantum' ? 'h-full bg-quantum' : 'h-full bg-accent'}
                 initial={reduceMotion ? false : { width: 0 }}
                 animate={{ width: `${completion}%` }}
@@ -295,7 +296,7 @@ export default function AcademyScreen({
               const mastery = progress.mastery[module.skillId]
               const completed = moduleLessons.filter((lesson) => progress.completedLessonIds.includes(lesson.id)).length
               return (
-                <motion.article
+                <m.article
                   key={module.id}
                   data-testid="academy-module"
                   initial={reduceMotion ? false : { opacity: 0, y: 10 }}
@@ -339,7 +340,7 @@ export default function AcademyScreen({
                       />
                     ))}
                   </div>
-                </motion.article>
+                </m.article>
               )
             })}
           </div>

@@ -64,6 +64,8 @@ export default function ProfileScreen({ language, academy, onBack, onOpenSetting
       active = false
       unsubscribe?.()
     }
+    // Solo depende de la función estable de sincronización, no del objeto completo.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [academy.syncNow, onlineAvailable])
 
   const exportProgress = async () => {

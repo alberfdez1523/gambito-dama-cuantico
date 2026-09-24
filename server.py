@@ -2,28 +2,32 @@
 Backend de Gambito de Dama Cuantico.
 
 Este servicio hace 3 cosas:
-1) Levanta Stockfish localmente.
-2) Expone endpoints HTTP para pedir jugadas/evaluaciones.
+1) Levanta un pool acotado de Stockfish.
+2) Expone endpoints HTTP para jugadas/evaluaciones clásicas y cuánticas y la API v1.
 3) Sirve el frontend estático para jugar desde el navegador.
 
 Ejecución local:
     python server.py
 """
 
-import os, pathlib, json, sys, threading, asyncio, time
-from concurrent.futures import CancelledError
+from __future__ import annotations
+
+import asyncio
+import os
+import sys
+import threading
+import time
 from contextlib import asynccontextmanager
 from functools import partial
-from typing import Literal
+from typing import Annotated
 
 import chess
 import chess.engine
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from fastapi.exceptions import RequestValidationError
-from pydantic import BaseModel
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from pydantic import BaseModel, Field
 
 from backend.api_v1 import (
     CoachEvaluateRequest,
@@ -31,63 +35,47 @@ from backend.api_v1 import (
     create_api_v1_router,
     match_repository,
 )
-from backend.stockfish_pool import EnginePoolTimeout, StockfishPool
+from backend.coach import coach_evaluate
+from backend.engine_runtime import (
+    DIFFICULTIES,
+    ROOT_DIR,
+    DifficultyLevel,
+    EngineRuntime,
+    engine_unavailable,
+    find_stockfish,
+    score_to_eval,
+)
+from backend.quantum_boards import (
+    QuantumCastling,
+    QuantumEvalBatchItem,
+    QuantumEvalBatchRequest,
+    QuantumEvalBatchResponse,
+    QuantumEvalRequest,
+    QuantumEvalResponse,
+    QuantumMoveRequest,
+    QuantumPieceInfo,
+    QuantumPieceSquare,
+    QuantumStatePayload,
+    generate_classical_boards,
+)
+from backend.rate_limit import RateLimitMiddleware
+from backend.static_site import mount_frontend
+
+# Alias públicos conservados para las pruebas y scripts existentes.
+_score_to_eval = score_to_eval
+_generate_classical_boards = generate_classical_boards
+
+__all__ = [
+    "app",
+    "QuantumCastling",
+    "QuantumPieceInfo",
+    "QuantumPieceSquare",
+    "QuantumStatePayload",
+]
 
 # ---------------------------------------------------------------------------
-# Localización del binario de Stockfish
+# Motor
 # ---------------------------------------------------------------------------
-HERE = pathlib.Path(__file__).parent.resolve()
-
-def find_stockfish():
-    """Busca el binario de Stockfish en rutas del sistema y en `engine/`.
-
-    Orden de búsqueda:
-    1. Rutas comunes del sistema (útil en Linux/Docker).
-    2. PATH.
-    3. Cualquier ejecutable compatible dentro de `engine/`.
-    """
-    import shutil, platform
-
-    def is_executable_file(path: pathlib.Path) -> bool:
-        """True si existe, es archivo regular y tiene permiso de ejecución."""
-        return path.is_file() and os.access(path, os.X_OK)
-
-    # Rutas típicas en Linux (incluyendo muchos contenedores Docker).
-    for system_path in ["/usr/games/stockfish", "/usr/bin/stockfish", "/usr/local/bin/stockfish"]:
-        sp = pathlib.Path(system_path)
-        if is_executable_file(sp):
-            return str(sp)
-
-    # Si está en el PATH, usamos esa versión.
-    sf = shutil.which("stockfish")
-    if sf:
-        return sf
-
-    # Si no está en PATH, buscamos una copia local en engine/.
-    engine_dir = HERE / "engine"
-    if engine_dir.exists():
-        is_windows = platform.system() == "Windows"
-
-        # 1) Ruta esperada cuando se compila desde source en Linux (Render).
-        preferred_candidates = [
-            engine_dir / "stockfish" / "src" / ("stockfish.exe" if is_windows else "stockfish"),
-            engine_dir / ("stockfish.exe" if is_windows else "stockfish"),
-        ]
-        for candidate in preferred_candidates:
-            if is_executable_file(candidate):
-                return str(candidate)
-
-        # 2) Búsqueda general: solo archivos ejecutables y con nombre razonable.
-        if is_windows:
-            for p in engine_dir.rglob("*.exe"):
-                if "stockfish" in p.name.lower() and is_executable_file(p):
-                    return str(p)
-        else:
-            for p in engine_dir.rglob("*"):
-                if "stockfish" in p.name.lower() and is_executable_file(p):
-                    return str(p)
-    return None
-
 STOCKFISH_PATH = find_stockfish()
 SKIP_STOCKFISH = os.getenv("SKIP_STOCKFISH") == "1"
 
@@ -100,41 +88,16 @@ elif STOCKFISH_PATH is None:
 else:
     print(f"Stockfish found: {STOCKFISH_PATH}")
 
-# ---------------------------------------------------------------------------
-# Presets de dificultad
-# ---------------------------------------------------------------------------
-# `skill` controla fuerza interna del motor (0-20 en builds compatibles).
-# `depth` y `time` limitan búsqueda para mantener respuesta fluida.
-DIFFICULTIES = {
-    "beginner": {"skill": 0,  "depth": 1,  "time": 0.05, "elo": 800},
-    "easy":     {"skill": 5,  "depth": 5,  "time": 0.15, "elo": 1200},
-    "medium":   {"skill": 10, "depth": 10, "time": 0.3,  "elo": 1600},
-    "hard":     {"skill": 15, "depth": 14, "time": 0.6,  "elo": 2000},
-    "master":   {"skill": 20, "depth": 20, "time": 1.0,  "elo": 2600},
-}
+engine = EngineRuntime(STOCKFISH_PATH, skip=SKIP_STOCKFISH)
 
-DifficultyLevel = Literal["beginner", "easy", "medium", "hard", "master"]
-
-# ---------------------------------------------------------------------------
-# Pool acotado de motores reutilizables
-# ---------------------------------------------------------------------------
-# Cada proceso atiende una sola orden; la cola acotada evita cancelaciones entre
-# peticiones y limita el consumo total de CPU/memoria.
-engine_pool: StockfishPool | None = None
 eval_cache_lock = threading.Lock()
 eval_cache: dict[tuple[str, int], tuple[float, float, int | None]] = {}
 EVAL_CACHE_TTL_SECONDS = 300
 EVAL_CACHE_MAX_ITEMS = 512
 
 
-def _score_to_eval(score: chess.engine.PovScore) -> tuple[float, int | None]:
-    """Convierte un score de python-chess a evaluación numérica y mate."""
-    white_score = score.white()
-    if white_score.is_mate():
-        mate = white_score.mate()
-        evaluation = 10000.0 if (mate and mate > 0) else -10000.0
-        return evaluation, mate
-    return float(white_score.score(mate_score=10000)), None
+def _bad_request(message: str) -> HTTPException:
+    return HTTPException(status_code=400, detail={"error": message, "code": "BAD_REQUEST"})
 
 
 def _json_error(status_code: int, code: str, message: str) -> JSONResponse:
@@ -146,60 +109,17 @@ def _http_status_to_code(status_code: int) -> str:
         400: "BAD_REQUEST",
         404: "NOT_FOUND",
         422: "VALIDATION_ERROR",
+        429: "RATE_LIMITED",
         503: "ENGINE_UNAVAILABLE",
     }.get(status_code, "ERROR")
 
 
-def _engine_is_alive() -> bool:
-    return engine_pool is not None and engine_pool.healthy()
-
-
-def _with_engine_lock(callback):
-    """Lease one engine from the bounded pool for the duration of a command."""
-    active_pool = engine_pool
-    if active_pool is None:
-        raise HTTPException(status_code=503, detail={"error": "Engine not ready", "code": "ENGINE_UNAVAILABLE"})
-
-    try:
-        return active_pool.run(callback)
-    except (CancelledError, EnginePoolTimeout) as exc:
-        raise HTTPException(
-            status_code=503,
-            detail={"error": "Engine queue is busy; retry the request", "code": "ENGINE_UNAVAILABLE"},
-        ) from exc
-    except chess.engine.EngineTerminatedError as exc:
-        raise HTTPException(
-            status_code=503,
-            detail={"error": "Engine terminated unexpectedly", "code": "ENGINE_UNAVAILABLE"},
-        ) from exc
-    except chess.engine.EngineError as exc:
-        raise HTTPException(
-            status_code=503,
-            detail={"error": f"Engine error: {exc}", "code": "ENGINE_UNAVAILABLE"},
-        ) from exc
-
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(_app: FastAPI):
     """Ciclo de vida de FastAPI: arranque y apagado limpio del motor."""
-    global engine_pool
-    if STOCKFISH_PATH and not SKIP_STOCKFISH:
-        pool_size = max(1, min(int(os.getenv("STOCKFISH_POOL_SIZE", "2")), 8))
-        print(f"Starting Stockfish pool ({pool_size} workers)...")
-        engine_pool = StockfishPool(
-            STOCKFISH_PATH,
-            size=pool_size,
-            acquire_timeout=float(os.getenv("STOCKFISH_QUEUE_TIMEOUT", "3")),
-        )
-        engine_pool.start()
-        print("Engine pool ready")
-    else:
-        engine_pool = None
-        print("Skipping engine startup (test mode or no binary)")
+    engine.start()
     yield
-    print("Shutting down engine pool...")
-    if engine_pool is not None:
-        engine_pool.close()
-        engine_pool = None
+    engine.close()
 
 
 app = FastAPI(title="Gambito de Dama Cuantico", lifespan=lifespan)
@@ -213,294 +133,99 @@ async def http_exception_handler(_request: Request, exc: HTTPException):
 
 
 @app.exception_handler(RequestValidationError)
-async def validation_exception_handler(_request: Request, exc: RequestValidationError):
+async def validation_exception_handler(_request: Request, _exc: RequestValidationError):
     return _json_error(422, "VALIDATION_ERROR", "Invalid request payload")
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+
+app.add_middleware(RateLimitMiddleware)
+
+# El frontend se sirve desde el mismo origen, así que CORS solo hace falta para
+# orígenes explícitos (por ejemplo un frontend desplegado aparte).
+_cors_origins = [origin.strip() for origin in os.getenv("CORS_ORIGINS", "").split(",") if origin.strip()]
+if _cors_origins:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=_cors_origins,
+        allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
+        allow_headers=["Authorization", "Content-Type", "X-Guest-Id"],
+    )
 
 
 # ---------------------------------------------------------------------------
-# Esquemas de entrada/salida (validación + documentación automática)
+# Esquemas clásicos
 # ---------------------------------------------------------------------------
+FenString = Annotated[str, Field(min_length=1, max_length=120)]
+
+
 class MoveRequest(BaseModel):
-    fen: str
+    fen: FenString
     difficulty: DifficultyLevel = "medium"
 
+
 class MoveResponse(BaseModel):
-    bestmove: str          # UCI notation e.g. "e2e4"
-    evaluation: float      # centipawns from white's perspective
-    mate: int | None       # mate in N moves (None if no mate)
-    ponder: str | None     # ponder move
+    bestmove: str  # UCI, p. ej. "e2e4"
+    evaluation: float  # centipawns desde blancas
+    mate: int | None
+    ponder: str | None
 
 
 class EvalRequest(BaseModel):
-    fen: str
-    depth: int = 12
+    fen: FenString
+    depth: Annotated[int, Field(ge=1, le=30)] = 12
+
 
 class EvalResponse(BaseModel):
     evaluation: float
     mate: int | None
 
 
-# ─── Esquemas cuánticos ───
-
-class QuantumPieceSquare(BaseModel):
-    square: str
-    probability: float
-
-class QuantumPieceInfo(BaseModel):
-    id: str
-    type: str          # p, n, b, r, q, k
-    color: str         # w, b
-    squares: list[QuantumPieceSquare]
-
-class QuantumCastling(BaseModel):
-    w: dict  # { k: bool, q: bool }
-    b: dict
-
-class QuantumStatePayload(BaseModel):
-    pieces: list[QuantumPieceInfo]
-    turn: str
-    castling: QuantumCastling
-
-class QuantumMoveRequest(BaseModel):
-    quantum_state: QuantumStatePayload
-    difficulty: DifficultyLevel = "medium"
-
-class QuantumMoveResponse(BaseModel):
-    pieceId: str
-    from_sq: str          # "from" es palabra reservada en Python
-    to: str
-    promotion: str | None = None
-    weightedEval: float
-    universeCount: int
+def _parse_fen(fen: str) -> chess.Board:
+    try:
+        return chess.Board(fen)
+    except ValueError as exc:
+        raise _bad_request("Invalid FEN") from exc
 
 
-class QuantumEvalRequest(BaseModel):
-    quantum_state: QuantumStatePayload
-    depth: int = 8
-    max_boards: int = 128
-
-
-class QuantumEvalResponse(BaseModel):
-    evaluation: float
-    mate: int | None
-    universeCount: int
-
-
-class QuantumEvalBatchRequest(BaseModel):
-    quantum_states: list[QuantumStatePayload]
-    depth: int = 8
-    max_boards: int = 128
-
-
-class QuantumEvalBatchItem(BaseModel):
-    evaluation: float
-    mate: int | None
-    universeCount: int
-
-
-class QuantumEvalBatchResponse(BaseModel):
-    results: list[QuantumEvalBatchItem]
+async def _run_blocking(func, *args):
+    loop = asyncio.get_running_loop()
+    return await loop.run_in_executor(None, partial(func, *args))
 
 
 # ---------------------------------------------------------------------------
-# Generador de tableros clásicos desde estado cuántico (Enfoque Multiverso)
-# ---------------------------------------------------------------------------
-
-PIECE_TYPE_MAP = {"p": chess.PAWN, "n": chess.KNIGHT, "b": chess.BISHOP,
-                  "r": chess.ROOK, "q": chess.QUEEN, "k": chess.KING}
-
-def _generate_classical_boards(qs: QuantumStatePayload, max_boards: int = 128):
-    """Genera todos los tableros clásicos posibles a partir del estado cuántico.
-
-    Cada pieza cuántica (>1 posición) genera opciones.
-    El producto cartesiano de opciones produce universos clásicos.
-    Se descartan universos con conflictos (dos piezas en la misma casilla).
-    """
-    classical = []
-    quantum = []
-
-    for p in qs.pieces:
-        if len(p.squares) == 1 and p.squares[0].probability >= 1.0:
-            classical.append(p)
-        else:
-            quantum.append(p)
-
-    if not quantum:
-        # Todo clásico → un solo tablero
-        board = _build_board(classical, [], qs.turn, qs.castling)
-        if board:
-            piece_map = {s.squares[0].square: s.id for s in classical}
-            return [{"fen": board.fen(), "probability": 1.0, "piece_map": piece_map}]
-        return []
-
-    # Generar opciones para cada pieza cuántica
-    options_list = []
-    for p in quantum:
-        opts = [(p, sq.square, sq.probability) for sq in p.squares]
-        options_list.append(opts)
-
-    from itertools import product as cart_product
-    boards = []
-
-    for combo in cart_product(*options_list):
-        if len(boards) >= max_boards:
-            break
-
-        prob = 1.0
-        placements = {}  # square → piece_info
-        valid = True
-
-        # Primero poner piezas clásicas
-        for p in classical:
-            sq = p.squares[0].square
-            if sq in placements:
-                valid = False
-                break
-            placements[sq] = p
-
-        if not valid:
-            continue
-
-        # Luego las cuánticas para esta combinación
-        for piece_info, sq, sq_prob in combo:
-            prob *= sq_prob
-            if sq in placements:
-                valid = False
-                break
-            placements[sq] = piece_info
-
-        if not valid or prob < 1e-6:
-            continue
-
-        # Construir tablero chess.Board
-        board = chess.Board(None)
-        board.clear()
-
-        for sq_str, pi in placements.items():
-            cell = chess.parse_square(sq_str)
-            ptype = PIECE_TYPE_MAP.get(pi.type)
-            if ptype is None:
-                continue
-            is_white = pi.color == "w"
-            board.set_piece_at(cell, chess.Piece(ptype, is_white))
-
-        board.turn = chess.WHITE if qs.turn == "w" else chess.BLACK
-
-        # Derechos de enroque
-        cr = chess.BB_EMPTY
-        if qs.castling.w.get("k", False):
-            cr |= chess.BB_H1
-        if qs.castling.w.get("q", False):
-            cr |= chess.BB_A1
-        if qs.castling.b.get("k", False):
-            cr |= chess.BB_H8
-        if qs.castling.b.get("q", False):
-            cr |= chess.BB_A8
-        board.castling_rights = cr
-
-        piece_map = {sq_str: pi.id for sq_str, pi in placements.items()}
-        boards.append({"fen": board.fen(), "probability": prob, "piece_map": piece_map})
-
-    # Normalizar probabilidades
-    total = sum(b["probability"] for b in boards)
-    if total > 0:
-        for b in boards:
-            b["probability"] /= total
-
-    return boards
-
-
-def _build_board(classical_pieces, quantum_choices, turn, castling):
-    """Helper para construir un chess.Board."""
-    board = chess.Board(None)
-    board.clear()
-
-    for p in classical_pieces:
-        sq = chess.parse_square(p.squares[0].square)
-        ptype = PIECE_TYPE_MAP.get(p.type)
-        if ptype:
-            board.set_piece_at(sq, chess.Piece(ptype, p.color == "w"))
-
-    for p, sq_str, _ in quantum_choices:
-        sq = chess.parse_square(sq_str)
-        ptype = PIECE_TYPE_MAP.get(p.type)
-        if ptype:
-            board.set_piece_at(sq, chess.Piece(ptype, p.color == "w"))
-
-    board.turn = chess.WHITE if turn == "w" else chess.BLACK
-    cr = chess.BB_EMPTY
-    if castling.w.get("k", False):
-        cr |= chess.BB_H1
-    if castling.w.get("q", False):
-        cr |= chess.BB_A1
-    if castling.b.get("k", False):
-        cr |= chess.BB_H8
-    if castling.b.get("q", False):
-        cr |= chess.BB_A8
-    board.castling_rights = cr
-    return board
-
-
-# ---------------------------------------------------------------------------
-# Endpoints API
+# Endpoints clásicos
 # ---------------------------------------------------------------------------
 def _get_best_move_sync(req: MoveRequest) -> MoveResponse:
     preset = DIFFICULTIES[req.difficulty]
-
-    try:
-        board = chess.Board(req.fen)
-    except ValueError:
-        raise HTTPException(status_code=400, detail={"error": "Invalid FEN", "code": "BAD_REQUEST"})
-
+    board = _parse_fen(req.fen)
     if board.is_game_over():
-        raise HTTPException(status_code=400, detail={"error": "Game is already over", "code": "BAD_REQUEST"})
+        raise _bad_request("Game is already over")
 
     def _run_move(active_engine: chess.engine.SimpleEngine):
         try:
             active_engine.configure({"Skill Level": preset["skill"]})
         except chess.engine.EngineError:
             pass
-
-        limit = chess.engine.Limit(
-            depth=preset["depth"],
-            time=preset["time"],
-        )
+        limit = chess.engine.Limit(depth=preset["depth"], time=preset["time"])
         return active_engine.play(board, limit, info=chess.engine.INFO_SCORE)
 
-    result = _with_engine_lock(_run_move)
-
-    evaluation = 0.0
-    mate = None
-    if result.info and "score" in result.info:
-        evaluation, mate = _score_to_eval(result.info["score"])
-
+    result = engine.run(_run_move)
     if result.move is None:
-        raise HTTPException(status_code=503, detail={"error": "Engine did not return a move", "code": "ENGINE_UNAVAILABLE"})
+        raise engine_unavailable("Engine did not return a move")
 
-    ponder_uci = result.ponder.uci() if result.ponder else None
-    best_uci = result.move.uci()
+    evaluation, mate = 0.0, None
+    if result.info and "score" in result.info:
+        evaluation, mate = score_to_eval(result.info["score"])
 
     return MoveResponse(
-        bestmove=best_uci,
+        bestmove=result.move.uci(),
         evaluation=evaluation,
         mate=mate,
-        ponder=ponder_uci,
+        ponder=result.ponder.uci() if result.ponder else None,
     )
 
 
 def _get_evaluation_sync(req: EvalRequest) -> EvalResponse:
-    try:
-        board = chess.Board(req.fen)
-    except ValueError:
-        raise HTTPException(status_code=400, detail={"error": "Invalid FEN", "code": "BAD_REQUEST"})
-
+    board = _parse_fen(req.fen)
     depth = min(req.depth, 18)
     cache_key = (board.fen(), depth)
     now = time.monotonic()
@@ -509,16 +234,13 @@ def _get_evaluation_sync(req: EvalRequest) -> EvalResponse:
         if cached and now - cached[0] <= EVAL_CACHE_TTL_SECONDS:
             return EvalResponse(evaluation=cached[1], mate=cached[2])
 
-    info = _with_engine_lock(
-        lambda active_engine: active_engine.analyse(
-            board,
-            chess.engine.Limit(depth=depth, time=0.3),
-        )
+    info = engine.run(
+        lambda active_engine: active_engine.analyse(board, chess.engine.Limit(depth=depth, time=0.3))
     )
     if "score" not in info:
-        raise HTTPException(status_code=503, detail={"error": "Engine did not return an evaluation", "code": "ENGINE_UNAVAILABLE"})
+        raise engine_unavailable("Engine did not return an evaluation")
 
-    evaluation, mate = _score_to_eval(info["score"])
+    evaluation, mate = score_to_eval(info["score"])
     with eval_cache_lock:
         eval_cache[cache_key] = (now, evaluation, mate)
         if len(eval_cache) > EVAL_CACHE_MAX_ITEMS:
@@ -530,120 +252,89 @@ def _get_evaluation_sync(req: EvalRequest) -> EvalResponse:
 @app.post("/api/move", response_model=MoveResponse)
 async def get_best_move(req: MoveRequest):
     """Devuelve la mejor jugada de Stockfish para una posición FEN."""
-    loop = asyncio.get_running_loop()
-    return await loop.run_in_executor(None, partial(_get_best_move_sync, req))
+    return await _run_blocking(_get_best_move_sync, req)
 
 
 @app.post("/api/eval", response_model=EvalResponse)
 async def get_evaluation(req: EvalRequest):
     """Evalúa una posición sin pedir jugada."""
-    loop = asyncio.get_running_loop()
-    return await loop.run_in_executor(None, partial(_get_evaluation_sync, req))
+    return await _run_blocking(_get_evaluation_sync, req)
 
 
 @app.get("/api/health")
 def health():
     """Endpoint liviano para saber si backend+motor están listos."""
-    alive = _engine_is_alive()
-    return {
-        "status": "ok" if alive else "degraded",
-        "engine": alive,
-        "engine_path": STOCKFISH_PATH,
-    }
+    alive = engine.alive()
+    return {"status": "ok" if alive else "degraded", "engine": alive}
 
 
 # ---------------------------------------------------------------------------
-# Endpoint Cuántico — Enfoque Multiverso
+# Endpoints cuánticos — enfoque multiverso
 # ---------------------------------------------------------------------------
 def _quantum_move_sync(req: QuantumMoveRequest):
     preset = DIFFICULTIES[req.difficulty]
-
-    # 1) Generar todos los universos clásicos
-    boards = _generate_classical_boards(req.quantum_state)
+    boards = generate_classical_boards(req.quantum_state)
     if not boards:
-        raise HTTPException(status_code=400, detail={"error": "No valid classical boards could be generated", "code": "BAD_REQUEST"})
+        raise _bad_request("No valid classical boards could be generated")
 
-    # 2) Para cada universo, pedir a Stockfish la mejor jugada
-    move_votes: dict[str, float] = {}    # move_uci → suma de probabilidades
-    move_evals: dict[str, list] = {}      # move_uci → lista de (prob, eval)
-    move_piece_maps: dict[str, dict] = {} # move_uci → piece_map del primer universo
+    move_votes: dict[str, float] = {}  # move_uci → suma de probabilidades
+    move_evals: dict[str, list[tuple[float, float]]] = {}
+    move_piece_maps: dict[str, dict] = {}  # move_uci → piece_map del primer universo
 
     def _run_quantum(active_engine: chess.engine.SimpleEngine):
         try:
             active_engine.configure({"Skill Level": preset["skill"]})
         except chess.engine.EngineError:
             pass
-
         limit = chess.engine.Limit(depth=min(preset["depth"], 14), time=min(preset["time"], 0.5))
 
-        for b in boards:
+        for candidate in boards:
             try:
-                board = chess.Board(b["fen"])
+                board = chess.Board(candidate["fen"])
             except ValueError:
                 continue
-
             if board.is_game_over() or not any(board.legal_moves):
                 continue
-
             try:
                 result = active_engine.play(board, limit, info=chess.engine.INFO_SCORE)
             except chess.engine.EngineError:
                 continue
-
             if result.move is None:
                 continue
 
             move_uci = result.move.uci()
-            prob = b["probability"]
-
-            ev = 0.0
+            evaluation = 0.0
             if result.info and "score" in result.info:
-                ev, _ = _score_to_eval(result.info["score"])
+                evaluation, _ = score_to_eval(result.info["score"])
 
             if move_uci not in move_votes:
                 move_votes[move_uci] = 0.0
                 move_evals[move_uci] = []
-                move_piece_maps[move_uci] = b["piece_map"]
+                move_piece_maps[move_uci] = candidate["piece_map"]
+            move_votes[move_uci] += candidate["probability"]
+            move_evals[move_uci].append((candidate["probability"], evaluation))
 
-            move_votes[move_uci] += prob
-            move_evals[move_uci].append((prob, ev))
-
-    _with_engine_lock(_run_quantum)
-
+    engine.run(_run_quantum)
     if not move_votes:
-        raise HTTPException(status_code=400, detail={"error": "No legal moves found in any universe", "code": "BAD_REQUEST"})
+        raise _bad_request("No legal moves found in any universe")
 
-    # 3) Elegir movimiento con mayor voto ponderado
     best_move = max(move_votes, key=move_votes.get)
-
-    # 4) Calcular evaluación ponderada total
     weighted_eval = sum(p * ev for evals in move_evals.values() for p, ev in evals)
-
-    # 5) Identificar qué pieza mueve (del piece_map del primer universo con ese movimiento)
     from_sq = best_move[:2]
-    to_sq = best_move[2:4]
-    promotion = best_move[4] if len(best_move) > 4 else None
-
-    piece_map = move_piece_maps.get(best_move, {})
-    piece_id = piece_map.get(from_sq, "")
-
     return {
-        "pieceId": piece_id,
+        "pieceId": move_piece_maps.get(best_move, {}).get(from_sq, ""),
         "from": from_sq,
-        "to": to_sq,
-        "promotion": promotion,
+        "to": best_move[2:4],
+        "promotion": best_move[4] if len(best_move) > 4 else None,
         "weightedEval": round(weighted_eval, 1),
         "universeCount": len(boards),
     }
 
 
 def _quantum_eval_sync(req: QuantumEvalRequest) -> QuantumEvalResponse:
-    boards = _generate_classical_boards(req.quantum_state, max_boards=req.max_boards)
+    boards = generate_classical_boards(req.quantum_state, max_boards=req.max_boards)
     if not boards:
-        raise HTTPException(
-            status_code=400,
-            detail={"error": "No valid classical boards could be generated", "code": "BAD_REQUEST"},
-        )
+        raise _bad_request("No valid classical boards could be generated")
 
     depth = min(req.depth, 10)
 
@@ -651,58 +342,36 @@ def _quantum_eval_sync(req: QuantumEvalRequest) -> QuantumEvalResponse:
         weighted_eval = 0.0
         total_prob = 0.0
         mate = None
-
-        for b in boards:
+        for candidate in boards:
             try:
-                board = chess.Board(b["fen"])
+                board = chess.Board(candidate["fen"])
             except ValueError:
                 continue
-
             if board.is_game_over():
                 continue
-
-            info = active_engine.analyse(
-                board,
-                chess.engine.Limit(depth=depth, time=0.2),
-            )
-
+            info = active_engine.analyse(board, chess.engine.Limit(depth=depth, time=0.2))
             if "score" not in info:
                 continue
-
-            ev, local_mate = _score_to_eval(info["score"])
-            weighted_eval += b["probability"] * ev
-            total_prob += b["probability"]
-
+            evaluation, local_mate = score_to_eval(info["score"])
+            weighted_eval += candidate["probability"] * evaluation
+            total_prob += candidate["probability"]
             if local_mate is not None:
                 mate = local_mate
 
         if total_prob <= 0:
-            raise HTTPException(
-                status_code=400,
-                detail={"error": "No evaluable boards", "code": "BAD_REQUEST"},
-            )
-
+            raise _bad_request("No evaluable boards")
         return QuantumEvalResponse(
             evaluation=round(weighted_eval / total_prob, 1),
             mate=mate,
             universeCount=len(boards),
         )
 
-    return _with_engine_lock(_run_eval)
-
-
-@app.post("/api/quantum/eval", response_model=QuantumEvalResponse)
-async def quantum_eval(req: QuantumEvalRequest):
-    """Evalúa un estado cuántico ponderando universos clásicos (sin decidir jugadas)."""
-    loop = asyncio.get_running_loop()
-    return await loop.run_in_executor(None, partial(_quantum_eval_sync, req))
+    return engine.run(_run_eval)
 
 
 def _quantum_eval_batch_sync(req: QuantumEvalBatchRequest) -> QuantumEvalBatchResponse:
     if not req.quantum_states:
-        raise HTTPException(status_code=400, detail={"error": "No quantum states provided", "code": "BAD_REQUEST"})
-    if len(req.quantum_states) > 24:
-        raise HTTPException(status_code=400, detail={"error": "Too many states (max 24)", "code": "BAD_REQUEST"})
+        raise _bad_request("No quantum states provided")
 
     results: list[QuantumEvalBatchItem] = []
     for state in req.quantum_states:
@@ -710,20 +379,21 @@ def _quantum_eval_batch_sync(req: QuantumEvalBatchRequest) -> QuantumEvalBatchRe
             QuantumEvalRequest(quantum_state=state, depth=req.depth, max_boards=req.max_boards),
         )
         results.append(
-            QuantumEvalBatchItem(
-                evaluation=item.evaluation,
-                mate=item.mate,
-                universeCount=item.universeCount,
-            ),
+            QuantumEvalBatchItem(evaluation=item.evaluation, mate=item.mate, universeCount=item.universeCount)
         )
     return QuantumEvalBatchResponse(results=results)
+
+
+@app.post("/api/quantum/eval", response_model=QuantumEvalResponse)
+async def quantum_eval(req: QuantumEvalRequest):
+    """Evalúa un estado cuántico ponderando universos clásicos (sin decidir jugadas)."""
+    return await _run_blocking(_quantum_eval_sync, req)
 
 
 @app.post("/api/quantum/eval-batch", response_model=QuantumEvalBatchResponse)
 async def quantum_eval_batch(req: QuantumEvalBatchRequest):
     """Evalúa varios estados cuánticos en una sola petición."""
-    loop = asyncio.get_running_loop()
-    return await loop.run_in_executor(None, partial(_quantum_eval_batch_sync, req))
+    return await _run_blocking(_quantum_eval_batch_sync, req)
 
 
 @app.post("/api/quantum/move")
@@ -731,137 +401,16 @@ async def quantum_move(req: QuantumMoveRequest):
     """Endpoint experimental: voto de bestmove clásico por universo.
 
     La IA de producto usa quantumAi.ts + /api/quantum/eval. Este endpoint queda
-  para análisis/manual QA.
+    para análisis/QA manual.
     """
-    loop = asyncio.get_running_loop()
-    return await loop.run_in_executor(None, partial(_quantum_move_sync, req))
+    return await _run_blocking(_quantum_move_sync, req)
 
 
 # ---------------------------------------------------------------------------
 # API v1: progreso, coach determinista, retos y partidas autoritativas
 # ---------------------------------------------------------------------------
-
-def _coach_classification(centipawn_loss: float) -> str:
-    if centipawn_loss <= 10:
-        return "best"
-    if centipawn_loss <= 30:
-        return "excellent"
-    if centipawn_loss <= 70:
-        return "good"
-    if centipawn_loss <= 130:
-        return "inaccuracy"
-    if centipawn_loss <= 260:
-        return "mistake"
-    return "blunder"
-
-
 def _coach_evaluate(req: CoachEvaluateRequest) -> dict:
-    """Produce reproducible feedback without sending positions to generative models."""
-    if req.ruleset_id != "classic":
-        ranked = sorted(
-            req.legal_actions,
-            key=lambda candidate: (
-                -float(candidate.get("evaluation", 0)),
-                json.dumps(candidate.get("action", {}), sort_keys=True),
-            ),
-        )[:3]
-        return {
-            "classification": "best" if ranked else "good",
-            "concepts": ["quantum.expected-material", "quantum.coherence", "quantum.king-safety"],
-            "candidates": [
-                {
-                    "action": candidate.get("action", {}),
-                    "score": float(candidate.get("evaluation", 0)),
-                    "probability": candidate.get("probability"),
-                }
-                for candidate in ranked
-            ],
-            "probabilities": [candidate.get("probability") for candidate in ranked if candidate.get("probability") is not None],
-            "explanationKey": "coach.quantum.deterministic-evaluation",
-            "engine": "quantum-enumerator-v1",
-            "seed": req.seed,
-        }
-
-    if not req.fen:
-        raise HTTPException(status_code=422, detail={"error": "FEN is required for classic coaching", "code": "VALIDATION_ERROR"})
-    try:
-        board = chess.Board(req.fen)
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail={"error": "Invalid FEN", "code": "BAD_REQUEST"}) from exc
-    if board.is_game_over():
-        raise HTTPException(status_code=400, detail={"error": "Game is already over", "code": "BAD_REQUEST"})
-
-    action_uci = req.action if isinstance(req.action, str) else None
-    side_to_move = board.turn
-
-    def _analyse(active_engine: chess.engine.SimpleEngine):
-        multipv = active_engine.analyse(
-            board,
-            chess.engine.Limit(depth=req.depth, time=0.45),
-            multipv=3,
-        )
-        infos = multipv if isinstance(multipv, list) else [multipv]
-        actual_evaluation = None
-        if action_uci:
-            try:
-                actual_move = chess.Move.from_uci(action_uci)
-            except ValueError as exc:
-                raise HTTPException(status_code=422, detail={"error": "Malformed action", "code": "ILLEGAL_ACTION"}) from exc
-            if actual_move not in board.legal_moves:
-                raise HTTPException(status_code=422, detail={"error": "Illegal action", "code": "ILLEGAL_ACTION"})
-            after = board.copy(stack=False)
-            after.push(actual_move)
-            actual_info = active_engine.analyse(after, chess.engine.Limit(depth=max(1, req.depth - 1), time=0.3))
-            if "score" in actual_info:
-                actual_evaluation, _mate = _score_to_eval(actual_info["score"])
-        return infos, actual_evaluation
-
-    infos, actual_evaluation = _with_engine_lock(_analyse)
-    candidates = []
-    for info in infos:
-        principal_variation = info.get("pv", [])
-        if not principal_variation or "score" not in info:
-            continue
-        evaluation, _mate = _score_to_eval(info["score"])
-        candidates.append({"action": principal_variation[0].uci(), "score": evaluation})
-    if not candidates:
-        raise HTTPException(status_code=503, detail={"error": "Coach returned no candidates", "code": "ENGINE_UNAVAILABLE"})
-
-    best_evaluation = candidates[0]["score"]
-    if action_uci and action_uci == candidates[0]["action"]:
-        centipawn_loss = 0.0
-    elif actual_evaluation is None:
-        centipawn_loss = 0.0
-    else:
-        centipawn_loss = (
-            best_evaluation - actual_evaluation
-            if side_to_move == chess.WHITE
-            else actual_evaluation - best_evaluation
-        )
-    centipawn_loss = max(0.0, centipawn_loss)
-
-    concepts = ["classic.calculation"]
-    if action_uci:
-        move = chess.Move.from_uci(action_uci)
-        if board.is_capture(move):
-            concepts.append("classic.tactics.capture")
-        if board.is_castling(move):
-            concepts.append("classic.opening.king-safety")
-        after = board.copy(stack=False)
-        after.push(move)
-        if after.is_check():
-            concepts.append("classic.tactics.check")
-
-    classification = _coach_classification(centipawn_loss)
-    return {
-        "classification": classification,
-        "concepts": concepts,
-        "candidates": candidates,
-        "probabilities": [],
-        "explanationKey": f"coach.classic.{classification}",
-        "centipawnLoss": round(centipawn_loss, 1),
-        "engine": "stockfish-multipv",
-    }
+    return coach_evaluate(req, engine.run)
 
 
 app.include_router(
@@ -872,135 +421,8 @@ app.include_router(
     )
 )
 
-
-# ---------------------------------------------------------------------------
-# Frontend estático
-# ---------------------------------------------------------------------------
-class CacheStaticFiles(StaticFiles):
-    def __init__(self, *args, cache_control: str, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.cache_control = cache_control
-
-    async def get_response(self, path: str, scope):
-        response = await super().get_response(path, scope)
-        response.headers.setdefault("Cache-Control", self.cache_control)
-        return response
-
-
-def cached_file_response(path: pathlib.Path, cache_control: str | None = None) -> FileResponse:
-    response = FileResponse(str(path))
-    if cache_control:
-        response.headers.setdefault("Cache-Control", cache_control)
-    return response
-
-
-DIST_DIR = HERE / "frontend" / "dist"
-USE_REACT = DIST_DIR.exists() and (DIST_DIR / "index.html").exists()
-
-if USE_REACT:
-    print(f"Serving React build from {DIST_DIR}")
-else:
-        print("React build not found. Run 'cd frontend && npm run build' or use 'npm run dev' inside frontend/")
-
-
-def frontend_not_built_response() -> HTMLResponse:
-        return HTMLResponse(
-                """
-<!DOCTYPE html>
-<html lang="es">
-    <head>
-        <meta charset="UTF-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <title>Frontend no compilado</title>
-        <style>
-            body {
-                font-family: system-ui, sans-serif;
-                margin: 0;
-                min-height: 100vh;
-                display: grid;
-                place-items: center;
-                background: #111111;
-                color: #f5f5f5;
-            }
-            main {
-                max-width: 680px;
-                padding: 32px;
-                border: 1px solid #2a2a2a;
-                border-radius: 16px;
-                background: #1a1a1a;
-            }
-            code {
-                font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
-                background: #222222;
-                padding: 2px 6px;
-                border-radius: 6px;
-            }
-        </style>
-    </head>
-    <body>
-        <main>
-            <h1>El frontend no está compilado</h1>
-            <p>Este backend ya no usa el frontend legado de la raíz del proyecto.</p>
-            <p>Compila la aplicación React con <code>cd frontend && npm install && npm run build</code> o ejecuta el entorno de desarrollo con <code>cd frontend && npm run dev</code>.</p>
-        </main>
-    </body>
-</html>
-                """.strip(),
-                status_code=503,
-        )
-
-# Música siempre se sirve desde music/
-_music_dir = HERE / "music"
-if _music_dir.exists():
-    app.mount(
-        "/music",
-        CacheStaticFiles(directory=str(_music_dir), cache_control="public, max-age=604800"),
-        name="music",
-    )
-
-# Assets del build de Vite (JS/CSS hasheados)
-if USE_REACT and (DIST_DIR / "assets").exists():
-    app.mount(
-        "/assets",
-        CacheStaticFiles(directory=str(DIST_DIR / "assets"), cache_control="public, max-age=31536000, immutable"),
-        name="assets",
-    )
-
-
-@app.get("/")
-def root():
-    if USE_REACT:
-        return cached_file_response(DIST_DIR / "index.html", "no-cache")
-    return frontend_not_built_response()
-
-
-@app.head("/")
-def root_head():
-    # Evita 405 en health checks que usan HEAD /
-    return {"status": "ok"}
-
-
-@app.get("/{filename:path}")
-def static_files(filename: str):
-    """Sirve frontend estático con fallback SPA para React."""
-    if USE_REACT:
-        fp = DIST_DIR / filename
-        if fp.is_file():
-            cache_control = "public, max-age=604800" if pathlib.Path(filename).suffix else None
-            return cached_file_response(fp, cache_control)
-
-        # Si parece un asset (tiene extensión), no devolver index.html.
-        # Evita que CSS/JS faltantes rompan silenciosamente la UI.
-        name = pathlib.Path(filename).name
-        if "." in name:
-            raise HTTPException(404)
-
-        return cached_file_response(DIST_DIR / "index.html", "no-cache")
-
-    name = pathlib.Path(filename).name
-    if "." in name:
-        raise HTTPException(404)
-    return frontend_not_built_response()
+# Debe registrarse al final: incluye la ruta comodín del fallback SPA.
+mount_frontend(app, ROOT_DIR)
 
 
 # ---------------------------------------------------------------------------
@@ -1008,6 +430,16 @@ def static_files(filename: str):
 # ---------------------------------------------------------------------------
 if __name__ == "__main__":
     import uvicorn
+
     port = int(os.getenv("PORT", "8000"))
     print(f"\nGambito de Dama Cuantico server -> http://localhost:{port}\n")
-    uvicorn.run(app, host="0.0.0.0", port=port, log_level="info")
+    uvicorn.run(
+        app,
+        host="0.0.0.0",
+        port=port,
+        log_level="info",
+        # Detrás de un proxy (Render) la IP real llega en X-Forwarded-For; solo se
+        # confía en ella para las IPs indicadas, necesario para el limitador.
+        proxy_headers=True,
+        forwarded_allow_ips=os.getenv("FORWARDED_ALLOW_IPS", "127.0.0.1"),
+    )

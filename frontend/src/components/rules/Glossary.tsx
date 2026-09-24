@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { AnimatePresence, motion } from 'framer-motion'
+import { AnimatePresence, m } from 'framer-motion'
 
 interface GlossaryProps {
   items: { term: string; def: string }[]
@@ -35,7 +35,7 @@ export default function Glossary({ items, es }: GlossaryProps) {
               </button>
               <AnimatePresence initial={false}>
                 {isOpen && (
-                  <motion.div
+                  <m.div
                     initial={{ height: 0, opacity: 0 }}
                     animate={{ height: 'auto', opacity: 1 }}
                     exit={{ height: 0, opacity: 0 }}
@@ -44,7 +44,7 @@ export default function Glossary({ items, es }: GlossaryProps) {
                     <p className="px-4 pb-3 text-ui-sm leading-relaxed text-neutral-400">
                       {item.def}
                     </p>
-                  </motion.div>
+                  </m.div>
                 )}
               </AnimatePresence>
             </div>

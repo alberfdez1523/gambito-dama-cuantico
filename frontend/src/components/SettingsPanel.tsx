@@ -1,4 +1,4 @@
-import { AnimatePresence, motion } from 'framer-motion'
+import { AnimatePresence, m } from 'framer-motion'
 import type { Language } from '../lib/types'
 import type {
   AppSettings,
@@ -36,7 +36,7 @@ export default function SettingsPanel({
   return (
     <AnimatePresence>
       {open && (
-        <motion.div
+        <m.div
           className="fixed inset-0 z-[70] flex items-end justify-center bg-black/65 sm:items-center sm:px-4"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -44,7 +44,7 @@ export default function SettingsPanel({
           onClick={onBackdropClick}
           role="presentation"
         >
-          <motion.section
+          <m.section
             ref={containerRef}
             role="dialog"
             aria-modal="true"
@@ -201,8 +201,8 @@ export default function SettingsPanel({
                 />
               </div>
             </div>
-          </motion.section>
-        </motion.div>
+          </m.section>
+        </m.div>
       )}
     </AnimatePresence>
   )

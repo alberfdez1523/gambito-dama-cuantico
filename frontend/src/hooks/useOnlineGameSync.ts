@@ -318,7 +318,7 @@ export function useOnlineGameSync({ config, enabled }: UseOnlineGameSyncOptions)
         setIsPushing(false)
       }
     },
-    [online?.roomId, refreshRoomFromServer, syncRoom, waitForRoom],
+    [online?.roomId, config.playerColor, refreshRoomFromServer, syncRoom, waitForRoom],
   )
 
   const pushQuantumState = useCallback(

@@ -51,6 +51,39 @@ function screenFromPath(pathname: string): AppScreen {
   return 'menu'
 }
 
+interface ResolvedRoute {
+  screen: AppScreen
+  /** Ruta canónica a la que hay que redirigir cuando la actual no es válida. */
+  redirect?: string
+}
+
+/** La URL es la única fuente de verdad de la pantalla activa. */
+function resolveRoute(pathname: string, hasActiveGame: boolean): ResolvedRoute {
+  if (!FEATURES.academy && pathname.startsWith('/learn')) return { screen: 'menu', redirect: '/' }
+  if (!FEATURES.dailyAndSprint && pathname.startsWith('/learn/sprint/')) return { screen: 'academy', redirect: '/learn' }
+  const screen = screenFromPath(pathname)
+  if (screen === 'game' && !hasActiveGame) return { screen: 'menu', redirect: '/' }
+  if (screen === 'lesson') {
+    const lessonId = lessonIdFromPath(pathname)
+    if (!lessonId || !ACADEMY_LESSON_BY_ID.has(lessonId)) return { screen: 'academy', redirect: '/learn' }
+  }
+  return { screen }
+}
+
+const DEFAULT_LOBBY_PREFS = {
+  gameMode: 'classic',
+  color: 'w',
+  useTimer: false,
+  timerMinutes: 10,
+  difficulty: 'medium',
+} as const satisfies {
+  gameMode: GameConfig['gameMode']
+  color: PlayerColorChoice
+  useTimer: boolean
+  timerMinutes: number
+  difficulty: GameConfig['difficulty']
+}
+
 function lessonIdFromPath(pathname: string): string | null {
   const match = pathname.match(/^\/learn\/([^/]+)\/?$/)
   return match ? decodeURIComponent(match[1]) : null
@@ -67,10 +100,8 @@ function joinCodeFromPath(pathname: string): string | null {
 }
 
 function ScreenLoadingFallback({
-  language,
   label,
 }: {
-  language: AppSettings['language']
   label: string
 }) {
   return (
@@ -84,7 +115,6 @@ function ScreenLoadingFallback({
 export default function App() {
   const location = useLocation()
   const navigate = useNavigate()
-  const [screen, setScreen] = useState<AppScreen>(() => screenFromPath(location.pathname))
   const [rulesInitialTab, setRulesInitialTab] = useState<'quantum' | 'tutorial'>('quantum')
   const [lessonSource, setLessonSource] = useState<'route' | 'review' | 'daily' | 'error'>('route')
   const [lobbyPrefs, setLobbyPrefs] = useState<{
@@ -111,42 +141,16 @@ export default function App() {
 
   const { language } = settings
 
+  const route = resolveRoute(location.pathname, gameConfig !== null)
+  const screen = route.screen
+
   useEffect(() => {
-    if (!FEATURES.academy && location.pathname.startsWith('/learn')) {
-      navigate('/', { replace: true })
-      setScreen('menu')
-      return
-    }
-    if (!FEATURES.dailyAndSprint && location.pathname.startsWith('/learn/sprint/')) {
-      navigate('/learn', { replace: true })
-      setScreen('academy')
-      return
-    }
-    const nextScreen = screenFromPath(location.pathname)
-    if (nextScreen === 'game' && !gameConfigRef.current) {
-      navigate('/', { replace: true })
-      setScreen('menu')
-      return
-    }
-    if (nextScreen === 'lesson') {
-      const lessonId = lessonIdFromPath(location.pathname)
-      if (!lessonId || !ACADEMY_LESSON_BY_ID.has(lessonId)) {
-        navigate('/learn', { replace: true })
-        setScreen('academy')
-        return
-      }
-    }
-    if (nextScreen === 'lobby' && !lobbyPrefs) {
-      setLobbyPrefs({
-        gameMode: 'classic',
-        color: 'w',
-        useTimer: false,
-        timerMinutes: 10,
-        difficulty: 'medium',
-      })
-    }
-    setScreen(nextScreen)
-  }, [location.pathname, lobbyPrefs, navigate])
+    if (route.redirect) navigate(route.redirect, { replace: true })
+  }, [navigate, route.redirect])
+
+  useEffect(() => {
+    if (screen === 'lobby' && !lobbyPrefs) setLobbyPrefs(DEFAULT_LOBBY_PREFS)
+  }, [lobbyPrefs, screen])
 
   useEffect(() => {
     document.documentElement.lang = language
@@ -189,20 +193,13 @@ export default function App() {
     const roomCode = parseRoomCodeFromUrl()
     if (!roomCode) return
 
-    setLobbyPrefs({
-      gameMode: 'classic',
-      color: 'w',
-      useTimer: false,
-      timerMinutes: 10,
-      difficulty: 'medium',
-    })
+    setLobbyPrefs(DEFAULT_LOBBY_PREFS)
     navigate(`/join/${encodeURIComponent(roomCode)}`, { replace: true })
-    setScreen('lobby')
   }, [navigate])
 
   useEffect(() => {
     const modeLabel = gameConfig?.gameMode === 'quantum'
-      ? language === 'es' ? ' | Modo Cuántico' : ' | Quantum Mode'
+      ? ui(language).quantumMode
       : ''
     document.title = `Gambito de Dama Cuántico${modeLabel}`
   }, [gameConfig, language])
@@ -245,7 +242,6 @@ export default function App() {
     setResumeAutosave(null)
     setGameInstance((value) => value + 1)
     setGameConfig(config)
-    setScreen('game')
     navigate('/play')
   }, [navigate])
 
@@ -263,7 +259,6 @@ export default function App() {
       timeControl: autosave.config.timeControl,
       options: autosave.config.options,
     })
-    setScreen('game')
     navigate('/play')
   }, [navigate])
 
@@ -281,7 +276,6 @@ export default function App() {
       difficulty: GameConfig['difficulty']
     }) => {
       setLobbyPrefs(prefs)
-      setScreen('lobby')
       navigate('/online')
     },
     [navigate],
@@ -298,14 +292,12 @@ export default function App() {
     setGameConfig(null)
     setResumeAutosave(null)
     setLobbyPrefs(null)
-    setScreen('menu')
     navigate('/')
   }, [navigate])
 
   const handlePrimaryNavigation = useCallback((destination: PrimaryDestination) => {
     if (destination === 'home' || destination === 'play') {
       navigate('/')
-      setScreen('menu')
       if (destination === 'play') {
         window.setTimeout(() => document.getElementById('game-setup')?.scrollIntoView({
           behavior: document.documentElement.dataset.motion === 'reduced' ? 'auto' : 'smooth',
@@ -315,11 +307,9 @@ export default function App() {
     }
     if (destination === 'learn') {
       navigate('/learn')
-      setScreen('academy')
       return
     }
     navigate('/profile')
-    setScreen('profile')
   }, [navigate])
 
   const activeLessonId = lessonIdFromPath(location.pathname)
@@ -352,11 +342,9 @@ export default function App() {
               onOpenOnlineLobby={handleOpenOnlineLobby}
               onRules={() => {
                 setRulesInitialTab('quantum')
-                setScreen('rules')
                 navigate('/rules')
               }}
               onQuantumTutorial={() => {
-                setScreen('academy')
                 navigate('/learn')
               }}
               academyProgress={academy.progress}
@@ -369,8 +357,7 @@ export default function App() {
             <Suspense
               fallback={
                 <ScreenLoadingFallback
-                  language={language}
-                  label={language === 'es' ? 'Abriendo sala...' : 'Opening room...'}
+                  label={ui(language).openingRoom}
                 />
               }
             >
@@ -393,9 +380,9 @@ export default function App() {
           </div>
         ) : screen === 'rules' ? (
           <div key="rules" className="screen-enter">
-            <Suspense fallback={<ScreenLoadingFallback language={language} label={ui(language).loadingRules} />}>
+            <Suspense fallback={<ScreenLoadingFallback label={ui(language).loadingRules} />}>
               <RulesScreen
-                onBack={() => { setScreen('menu'); navigate('/') }}
+                onBack={() => { navigate('/') }}
                 language={language}
                 initialTab={rulesInitialTab}
               />
@@ -403,19 +390,17 @@ export default function App() {
           </div>
         ) : screen === 'academy' ? (
           <div key="academy" className="screen-enter">
-            <Suspense fallback={<ScreenLoadingFallback language={language} label={language === 'es' ? 'Abriendo la Academia...' : 'Opening Academy...'} />}>
+            <Suspense fallback={<ScreenLoadingFallback label={ui(language).openingAcademy} />}>
               <AcademyScreen
                 language={language}
                 academy={academy}
-                onBack={() => { setScreen('menu'); navigate('/') }}
+                onBack={() => { navigate('/') }}
                 onOpenSettings={() => setSettingsOpen(true)}
                 onOpenLesson={(lessonId, source = 'route') => {
                   setLessonSource(source)
-                  setScreen('lesson')
                   navigate(`/learn/${encodeURIComponent(lessonId)}`)
                 }}
                 onOpenSprint={(minutes) => {
-                  setScreen('sprint')
                   navigate(`/learn/sprint/${minutes}`)
                 }}
               />
@@ -423,13 +408,13 @@ export default function App() {
           </div>
         ) : screen === 'lesson' && activeLesson ? (
           <div key={`lesson-${activeLesson.id}`} className="screen-enter">
-            <Suspense fallback={<ScreenLoadingFallback language={language} label={language === 'es' ? 'Preparando actividad...' : 'Preparing activity...'} />}>
+            <Suspense fallback={<ScreenLoadingFallback label={ui(language).preparingActivity} />}>
               <LessonScreen
                 lesson={activeLesson}
                 language={language}
                 academy={academy}
                 source={lessonSource}
-                onBack={() => { setScreen('academy'); navigate('/learn') }}
+                onBack={() => { navigate('/learn') }}
                 onOpenLesson={(lessonId) => {
                   setLessonSource('route')
                   navigate(`/learn/${encodeURIComponent(lessonId)}`)
@@ -439,23 +424,23 @@ export default function App() {
           </div>
         ) : screen === 'sprint' ? (
           <div key={`sprint-${location.pathname}`} className="screen-enter">
-            <Suspense fallback={<ScreenLoadingFallback language={language} label="Puzzle Sprint..." />}>
+            <Suspense fallback={<ScreenLoadingFallback label="Puzzle Sprint..." />}>
               <PuzzleSprintScreen
                 minutes={sprintMinutesFromPath(location.pathname)}
                 course={academy.progress.selectedCourse}
                 language={language}
                 academy={academy}
-                onBack={() => { setScreen('academy'); navigate('/learn') }}
+                onBack={() => { navigate('/learn') }}
               />
             </Suspense>
           </div>
         ) : screen === 'profile' ? (
           <div key="profile" className="screen-enter">
-            <Suspense fallback={<ScreenLoadingFallback language={language} label={language === 'es' ? 'Cargando perfil...' : 'Loading profile...'} />}>
+            <Suspense fallback={<ScreenLoadingFallback label={ui(language).loadingProfile} />}>
               <ProfileScreen
                 language={language}
                 academy={academy}
-                onBack={() => { setScreen('menu'); navigate('/') }}
+                onBack={() => { navigate('/') }}
                 onOpenSettings={() => setSettingsOpen(true)}
               />
             </Suspense>
@@ -465,8 +450,7 @@ export default function App() {
             <Suspense
               fallback={
                 <ScreenLoadingFallback
-                  language={language}
-                  label={language === 'es' ? 'Cargando partida...' : 'Loading game...'}
+                  label={ui(language).loadingGame}
                 />
               }
             >

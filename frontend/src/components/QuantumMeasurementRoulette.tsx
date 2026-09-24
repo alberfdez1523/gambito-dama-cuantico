@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
+import { m, AnimatePresence, useReducedMotion } from 'framer-motion'
 import type { Language, QMeasurementEvent } from '../lib/types'
 import { useModalA11y } from '../hooks/useModalA11y'
 
@@ -129,14 +129,14 @@ export default function QuantumMeasurementRoulette({
   return (
     <AnimatePresence>
       {visible && (
-        <motion.div
+        <m.div
           className="fixed inset-0 z-[80] flex items-end justify-center bg-black/75 px-0 pb-[env(safe-area-inset-bottom,0px)] backdrop-blur-sm lg:items-center lg:px-4 lg:pb-0"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           role="presentation"
         >
-          <motion.div
+          <m.div
             ref={containerRef}
             role="dialog"
             aria-modal="true"
@@ -203,7 +203,7 @@ export default function QuantumMeasurementRoulette({
             <div className="flex min-h-0 flex-1 flex-col px-4 py-3 lg:px-5 lg:py-4">
               <div className="flex flex-1 flex-col items-center justify-center">
                 <div className="relative mx-auto h-[min(36vw,28dvh)] w-[min(36vw,28dvh)] min-h-[7.5rem] min-w-[7.5rem] lg:h-48 lg:w-48 lg:min-h-0 lg:min-w-0">
-                  <motion.div
+                  <m.div
                     className="relative h-full w-full rounded-full p-2 lg:p-2.5"
                     animate={{ rotate: finalWheelRotation }}
                     transition={reduceMotion ? { duration: 0 } : { duration: 1.2, ease: [0.1, 0.9, 0.2, 1] }}
@@ -227,7 +227,7 @@ export default function QuantumMeasurementRoulette({
                       </span>
                       <span className="mt-0.5 text-[10px] text-neutral-500">{measuredTitle}</span>
                     </div>
-                  </motion.div>
+                  </m.div>
                   <div className="pointer-events-none absolute left-1/2 top-0 z-10 -translate-x-1/2">
                     <div className="h-0 w-0 border-x-[6px] border-t-[10px] border-x-transparent border-t-white drop-shadow" />
                   </div>
@@ -301,8 +301,8 @@ export default function QuantumMeasurementRoulette({
                 </button>
               </div>
             </div>
-          </motion.div>
-        </motion.div>
+          </m.div>
+        </m.div>
       )}
     </AnimatePresence>
   )

@@ -1,4 +1,4 @@
-import { motion, AnimatePresence } from 'framer-motion'
+import { m, AnimatePresence } from 'framer-motion'
 import type { MiniSquare } from './types'
 
 interface MiniBoardProps {
@@ -12,7 +12,7 @@ export default function MiniBoard({ squares, sqPx = 40, stepKey }: MiniBoardProp
 
   return (
     <AnimatePresence mode="wait">
-      <motion.div
+      <m.div
         key={stepKey ?? 'static'}
         className="mini-board mx-auto"
         style={{
@@ -40,7 +40,7 @@ export default function MiniBoard({ squares, sqPx = 40, stepKey }: MiniBoardProp
                         ? 'mini-sq-blocked'
                         : ''
           return (
-            <motion.div
+            <m.div
               key={i}
               layout
               className={`mini-sq ${sq.isLight ? 'mini-sq-light' : 'mini-sq-dark'} ${hlClass}`}
@@ -66,10 +66,10 @@ export default function MiniBoard({ squares, sqPx = 40, stepKey }: MiniBoardProp
                   {sq.arrowDir}
                 </span>
               )}
-            </motion.div>
+            </m.div>
           )
         })}
-      </motion.div>
+      </m.div>
     </AnimatePresence>
   )
 }

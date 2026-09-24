@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback, useMemo, useEffect } from 'react'
 import { Chess } from 'chess.js'
+import { asSquare, tryLoad, tryLoadPgn, tryMove } from '../lib/chessRules'
 import { requestAIMove, requestEval } from '../lib/api'
 import { PIECE_VALUES, FILES } from '../lib/constants'
 import { getColorName, getPieceName, translateGameOverInfo, ui } from '../lib/i18n'
@@ -37,8 +38,8 @@ function evalToChances(ev: number | null | undefined): Chances {
 function describeMove(m: {
   piece: string; to: string; flags: string; captured?: string; promotion?: string
 }, language: Language): string {
-  if (m.flags.includes('k')) return language === 'es' ? 'Enroque corto' : 'Kingside castling'
-  if (m.flags.includes('q')) return language === 'es' ? 'Enroque largo' : 'Queenside castling'
+  if (m.flags.includes('k')) return ui(language).kingsideCastling
+  if (m.flags.includes('q')) return ui(language).queensideCastling
   if (m.promotion) {
     return language === 'es'
       ? `Promoción a ${getPieceName(m.promotion as PieceType, language)}`
@@ -55,7 +56,7 @@ function describeMove(m: {
 }
 
 function needsPromotion(game: InstanceType<typeof Chess>, from: string, to: string): boolean {
-  const piece = game.get(from)
+  const piece = game.get(asSquare(from))
   if (!piece || piece.type !== 'p') return false
   const rank = to[1]
   return (piece.color === 'w' && rank === '8') || (piece.color === 'b' && rank === '1')
@@ -67,23 +68,23 @@ function detectGameEnd(
   isAIMode: boolean,
   language: Language,
 ): GameOverInfo | null {
-  if (!game.game_over()) return null
-  if (game.in_checkmate()) {
+  if (!game.isGameOver()) return null
+  if (game.isCheckmate()) {
     const loserTurn = game.turn()
     if (!isAIMode) {
       return loserTurn === 'w'
-        ? { title: language === 'es' ? 'Jaque mate' : 'Checkmate', message: language === 'es' ? 'Ganan negras' : 'Black wins', result: 'lose' }
-        : { title: language === 'es' ? 'Jaque mate' : 'Checkmate', message: language === 'es' ? 'Ganan blancas' : 'White wins', result: 'win' }
+        ? { title: ui(language).checkmate, message: ui(language).blackWins, result: 'lose' }
+        : { title: ui(language).checkmate, message: ui(language).whiteWins, result: 'win' }
     }
     return loserTurn === playerColor
-      ? { title: language === 'es' ? 'Derrota' : 'Defeat', message: language === 'es' ? 'La IA te ha dado jaque mate' : 'The AI checkmated you', result: 'lose' }
-      : { title: language === 'es' ? '¡Victoria!' : 'Victory!', message: language === 'es' ? 'Has ganado por jaque mate' : 'You won by checkmate', result: 'win' }
+      ? { title: ui(language).defeat, message: ui(language).aiCheckmatedYou, result: 'lose' }
+      : { title: ui(language).victory, message: ui(language).youWonByCheckmate, result: 'win' }
   }
-  if (game.in_stalemate()) return { title: language === 'es' ? 'Tablas' : 'Draw', message: language === 'es' ? 'Rey ahogado' : 'Stalemate', result: 'draw' }
-  if (game.in_threefold_repetition()) return { title: language === 'es' ? 'Tablas' : 'Draw', message: language === 'es' ? 'Triple repetición' : 'Threefold repetition', result: 'draw' }
-  if (game.insufficient_material()) return { title: language === 'es' ? 'Tablas' : 'Draw', message: language === 'es' ? 'Material insuficiente' : 'Insufficient material', result: 'draw' }
-  if (game.in_draw()) return { title: language === 'es' ? 'Tablas' : 'Draw', message: language === 'es' ? 'Empate técnico' : 'Draw', result: 'draw' }
-  return { title: language === 'es' ? 'Fin' : 'Game Over', message: language === 'es' ? 'Partida terminada' : 'Game finished', result: 'draw' }
+  if (game.isStalemate()) return { title: ui(language).draw, message: ui(language).stalemate, result: 'draw' }
+  if (game.isThreefoldRepetition()) return { title: ui(language).draw, message: ui(language).threefoldRepetition, result: 'draw' }
+  if (game.isInsufficientMaterial()) return { title: ui(language).draw, message: ui(language).insufficientMaterial, result: 'draw' }
+  if (game.isDraw()) return { title: ui(language).draw, message: ui(language).technicalDraw, result: 'draw' }
+  return { title: ui(language).gameOver, message: ui(language).gameFinished, result: 'draw' }
 }
 
 // ─── Sonidos ───
@@ -147,11 +148,13 @@ export function useChessGame(
   const legalSquares = useMemo(() => {
     if (!selectedSquare) return new Set<string>()
     try {
-      const moves = gameRef.current.moves({ square: selectedSquare, verbose: true }) as any[]
-      return new Set<string>(moves.map((m: any) => m.to))
+      const moves = gameRef.current.moves({ square: asSquare(selectedSquare), verbose: true })
+      return new Set<string>(moves.map((m) => m.to))
     } catch {
       return new Set<string>()
     }
+    // `fen` invalida la caché: la partida vive en un ref mutable.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fen, selectedSquare])
 
   const classicalCastleOptions = useMemo(() => {
@@ -161,19 +164,33 @@ export function useChessGame(
 
     const rank = allowedColor === 'w' ? '1' : '8'
     try {
-      const moves = game.moves({ square: `e${rank}`, verbose: true }) as any[]
+      const moves = game.moves({ square: asSquare(`e${rank}`), verbose: true })
       const options: Array<'k' | 'q'> = []
-      if (moves.some((m: any) => m.to === `g${rank}` && m.flags.includes('k'))) options.push('k')
-      if (moves.some((m: any) => m.to === `c${rank}` && m.flags.includes('q'))) options.push('q')
+      if (moves.some((m) => m.to === `g${rank}` && m.flags.includes('k'))) options.push('k')
+      if (moves.some((m) => m.to === `c${rank}` && m.flags.includes('q'))) options.push('q')
       return options
     } catch {
       return []
     }
+    // `fen` invalida la caché: la partida vive en un ref mutable.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fen, isAIMode, config.playerColor])
 
   const history: MoveInfo[] = useMemo(() => {
-    const moves = gameRef.current.history({ verbose: true }) as any[]
-    return moves.map((m: any) => ({ ...m, description: describeMove(m, language) }))
+    const moves = gameRef.current.history({ verbose: true })
+    return moves.map((m): MoveInfo => ({
+      color: m.color,
+      from: m.from,
+      to: m.to,
+      piece: m.piece,
+      captured: m.captured,
+      promotion: m.promotion,
+      san: m.san,
+      flags: m.flags,
+      description: describeMove(m, language),
+    }))
+    // `fen` invalida la caché: la partida vive en un ref mutable.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fen, language])
 
   const captures: CapturedPieces = useMemo(() => {
@@ -196,11 +213,11 @@ export function useChessGame(
   }, [captures])
 
   const turn = gameRef.current.turn() as PieceColor
-  const gameOver = !!gameOverInfo || gameRef.current.game_over()
+  const gameOver = !!gameOverInfo || gameRef.current.isGameOver()
 
   const checkSquare = useMemo(() => {
     const game = gameRef.current
-    if (!game.in_check()) return null
+    if (!game.inCheck()) return null
     const t = game.turn()
     const board = game.board()
     for (let r = 0; r < 8; r++) {
@@ -241,7 +258,7 @@ export function useChessGame(
   // ─── Obtener pieza en casilla ───
 
   const getPiece = useCallback(
-    (sq: string) => gameRef.current.get(sq) as { type: PieceType; color: PieceColor } | null,
+    (sq: string) => (gameRef.current.get(asSquare(sq)) ?? null) as { type: PieceType; color: PieceColor } | null,
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [fen]
   )
@@ -251,12 +268,12 @@ export function useChessGame(
   const doMove = useCallback(
     (from: string, to: string, promotion?: string) => {
       const game = gameRef.current
-      const result = game.move({ from, to, promotion })
+      const result = tryMove(game, { from, to, promotion })
       if (!result) return false
 
       if (result.captured) sounds.playCapture()
       else sounds.playMove()
-      if (game.in_check()) setTimeout(() => sounds.playCheck(), 80)
+      if (game.inCheck()) setTimeout(() => sounds.playCheck(), 80)
 
       setSelectedSquare(null)
       setLastMove({ from, to })
@@ -283,7 +300,7 @@ export function useChessGame(
   useEffect(() => {
     if (!isAIMode) return
     const game = gameRef.current
-    if (game.game_over() || isThinkingRef.current || !!gameOverInfo) return
+    if (game.isGameOver() || isThinkingRef.current || !!gameOverInfo) return
     if (game.turn() === config.playerColor) return
 
     const timer = setTimeout(async () => {
@@ -300,7 +317,7 @@ export function useChessGame(
         const to = data.bestmove.slice(2, 4)
         const promotion = data.bestmove[4] || undefined
 
-        const result = game.move({ from, to, promotion })
+        const result = tryMove(game, { from, to, promotion })
         if (!result) return
 
         if (result.captured) sounds.playCapture()
@@ -315,7 +332,7 @@ export function useChessGame(
         setLastMove({ from, to })
         setFen(game.fen())
 
-        if (game.in_check()) setTimeout(() => sounds.playCheck(), 80)
+        if (game.inCheck()) setTimeout(() => sounds.playCheck(), 80)
 
         const endInfo = detectGameEnd(game, config.playerColor, isAIMode, language)
         if (endInfo) {
@@ -366,21 +383,8 @@ export function useChessGame(
       cancelled = true
       clearTimeout(timer)
     }
-  }, [fen, isAIMode])
+  }, [fen, isAIMode, t.evalError])
 
-  // ─── Atajo de teclado (Ctrl+Z = deshacer) ───
-
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (e.ctrlKey && e.key === 'z') {
-        e.preventDefault()
-        undoMove()
-      }
-    }
-    window.addEventListener('keydown', handler)
-    return () => window.removeEventListener('keydown', handler)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
 
   // ─── Acciones del jugador ───
 
@@ -392,11 +396,11 @@ export function useChessGame(
       const allowedColor = isAIMode || isOnline ? config.playerColor : (game.turn() as PieceColor)
       if (game.turn() !== allowedColor) return
 
-      const clicked = game.get(sq)
+      const clicked = game.get(asSquare(sq))
 
       if (selectedSquare) {
-        const moves = game.moves({ square: selectedSquare, verbose: true }) as any[]
-        const isLegal = moves.some((m: any) => m.to === sq)
+        const moves = game.moves({ square: asSquare(selectedSquare), verbose: true })
+        const isLegal = moves.some((m) => m.to === sq)
 
         if (isLegal) {
           if (needsPromotion(game, selectedSquare, sq)) {
@@ -429,11 +433,11 @@ export function useChessGame(
       const allowedColor = isAIMode || isOnline ? config.playerColor : (game.turn() as PieceColor)
       if (game.turn() !== allowedColor) return
 
-      const piece = game.get(from)
+      const piece = game.get(asSquare(from))
       if (!piece || piece.color !== allowedColor) return
 
-      const moves = game.moves({ square: from, verbose: true }) as any[]
-      const isLegal = moves.some((m: any) => m.to === to)
+      const moves = game.moves({ square: asSquare(from), verbose: true })
+      const isLegal = moves.some((m) => m.to === to)
       if (!isLegal) {
         setSelectedSquare(null)
         return
@@ -452,15 +456,9 @@ export function useChessGame(
   const loadFen = useCallback(
     (fen: string, lastMove?: { from: string; to: string } | null, pgn?: string) => {
       const game = new Chess()
-      if (pgn?.trim()) {
-        try {
-          const loaded = (game as Chess & { load_pgn: (p: string) => boolean }).load_pgn(pgn)
-          if (!loaded) game.load(fen)
-        } catch {
-          game.load(fen)
-        }
-      } else {
-        game.load(fen)
+      const loadedPgn = Boolean(pgn?.trim()) && tryLoadPgn(game, pgn!)
+      if (!loadedPgn && !tryLoad(game, fen)) {
+        console.warn('[chess] Ignoring invalid FEN:', fen)
       }
       gameRef.current = game
       setSelectedSquare(null)
@@ -494,7 +492,7 @@ export function useChessGame(
     doMove(from, to)
   }, [config.playerColor, doMove, gameOverInfo, isAIMode, isOnline])
 
-  function undoMove() {
+  const undo = useCallback(() => {
     const game = gameRef.current
     if (isOnline || isThinkingRef.current || gameOverInfo) return
     const plies = isAIMode ? 2 : 1
@@ -503,9 +501,20 @@ export function useChessGame(
     setSelectedSquare(null)
     setLastMove(null)
     setFen(game.fen())
-  }
+  }, [gameOverInfo, isAIMode, isOnline])
 
-  const undo = useCallback(() => undoMove(), [gameOverInfo, isAIMode, isOnline])
+  // ─── Atajo de teclado (Ctrl+Z = deshacer) ───
+  // Depende de `undo` para no usar un estado de partida obsoleto (p. ej. tras terminar).
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.ctrlKey && e.key === 'z') {
+        e.preventDefault()
+        undo()
+      }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [undo])
 
   const flip = useCallback(() => {
     setBoardFlipped(prev => !prev)
@@ -515,8 +524,8 @@ export function useChessGame(
     if (gameOverInfo) return
     sounds.playGameEnd()
     setGameOverInfo({
-      title: language === 'es' ? 'Rendición' : 'Resignation',
-      message: language === 'es' ? 'Has abandonado la partida' : 'You resigned the game',
+      title: ui(language).resignation,
+      message: ui(language).youResignedTheGame,
       result: 'lose',
     })
   }, [gameOverInfo, sounds, language])
@@ -528,11 +537,11 @@ export function useChessGame(
       setGameOverInfo(
         isAIMode
           ? color === config.playerColor
-            ? { title: language === 'es' ? '¡Tiempo agotado!' : 'Time Out!', message: language === 'es' ? 'Se te acabó el tiempo' : 'You ran out of time', result: 'lose' }
-            : { title: language === 'es' ? '¡Victoria!' : 'Victory!', message: language === 'es' ? 'La IA se quedó sin tiempo' : 'The AI ran out of time', result: 'win' }
+            ? { title: ui(language).timeOutExclaimed, message: ui(language).youRanOutOfTime, result: 'lose' }
+            : { title: ui(language).victory, message: ui(language).aiRanOutOfTime, result: 'win' }
           : color === 'w'
-            ? { title: language === 'es' ? 'Tiempo agotado' : 'Time Out', message: language === 'es' ? 'Ganan negras por tiempo' : 'Black wins on time', result: 'lose' }
-            : { title: language === 'es' ? 'Tiempo agotado' : 'Time Out', message: language === 'es' ? 'Ganan blancas por tiempo' : 'White wins on time', result: 'win' }
+            ? { title: ui(language).timeOut, message: ui(language).blackWinsOnTime, result: 'lose' }
+            : { title: ui(language).timeOut, message: ui(language).whiteWinsOnTime, result: 'win' }
       )
     },
     [gameOverInfo, config.playerColor, sounds, isAIMode, language]

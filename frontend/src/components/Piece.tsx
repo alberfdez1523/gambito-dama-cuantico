@@ -1,5 +1,5 @@
 import { memo } from 'react'
-import { motion } from 'framer-motion'
+import { m } from 'framer-motion'
 import { PIECE_GLYPH } from '../lib/constants'
 import type { PieceColor, PieceType } from '../lib/types'
 
@@ -22,7 +22,7 @@ function Piece({ type, color, animate = true }: PieceProps) {
   }
 
   return (
-    <motion.span
+    <m.span
       className={className}
       initial={{ scale: 0.6, opacity: 0 }}
       animate={{ scale: 1, opacity: 1 }}
@@ -30,7 +30,7 @@ function Piece({ type, color, animate = true }: PieceProps) {
       aria-hidden="true"
     >
       {symbol}
-    </motion.span>
+    </m.span>
   )
 }
 

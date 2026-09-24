@@ -1,4 +1,4 @@
-import { pieceGlyph, PIECE_VALUES, CAPTURE_ORDER } from '../lib/constants'
+import { pieceGlyph, CAPTURE_ORDER } from '../lib/constants'
 import { formatTime } from '../hooks/useTimer'
 import type { PieceColor, PieceType } from '../lib/types'
 

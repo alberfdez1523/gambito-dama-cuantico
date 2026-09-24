@@ -1,6 +1,8 @@
 import { defineConfig, devices } from '@playwright/test'
 
 const browserChannel = process.env.PLAYWRIGHT_CHANNEL
+// Permite usar un Chromium ya instalado cuando no coincide con la versión de Playwright.
+const chromiumExecutable = process.env.PW_CHROMIUM_PATH
 
 export default defineConfig({
   testDir: './e2e',
@@ -22,6 +24,7 @@ export default defineConfig({
       use: {
         ...devices['Desktop Chrome'],
         ...(browserChannel ? { channel: browserChannel } : {}),
+        ...(chromiumExecutable ? { launchOptions: { executablePath: chromiumExecutable } } : {}),
       },
     },
     {

@@ -27,3 +27,18 @@ describe('online room move validation', () => {
     expect(isLegalMoveFromFen(baseFen, next.fen(), { from: 'a7', to: 'a8' })).toBe(true)
   })
 })
+
+describe('secure room identifiers', () => {
+  it('generates six-character codes from the unambiguous alphabet', async () => {
+    const { generateRoomCode } = await import('./onlineRoom')
+    const codes = new Set(Array.from({ length: 200 }, () => generateRoomCode()))
+    for (const code of codes) expect(code).toMatch(/^[A-HJ-NP-Z2-9]{6}$/)
+    expect(codes.size).toBeGreaterThan(190)
+  })
+
+  it('generates 128-bit hex measurement seeds', async () => {
+    const { randomSeed } = await import('./onlineRoom')
+    expect(randomSeed()).toMatch(/^[0-9a-f]{32}$/)
+    expect(randomSeed()).not.toBe(randomSeed())
+  })
+})

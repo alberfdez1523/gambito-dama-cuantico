@@ -16,8 +16,9 @@ import { useOnlineGameSync } from '../hooks/useOnlineGameSync'
 import { useSoundFX } from '../hooks/useSoundFX'
 import { useAmbientMusic } from '../hooks/useAmbientMusic'
 import { useTimer } from '../hooks/useTimer'
+import { usePlayerLabel } from '../hooks/usePlayerLabel'
 import { DIFFICULTIES } from '../lib/constants'
-import { getDifficultyLabel, getPlayerLabel, ui } from '../lib/i18n'
+import { getDifficultyLabel, ui } from '../lib/i18n'
 import type { AppSettings } from '../lib/settings'
 import type { GameConfig, GameResult, Language } from '../lib/types'
 import type { GameChromeModel, GameNotice, GameTone } from '../lib/gamePresentation'
@@ -132,6 +133,8 @@ export default function GameScreen({
       timer.restore(resumeAutosave.clocks)
     }
     setResumeHydrated(true)
+    // `game` y `timer` cambian en cada render; sus métodos usados aquí son estables.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [config.gameMode, config.opponentMode, config.playerColor, game.loadFen, resumeAutosave, timer.restore])
 
   useEffect(() => {
@@ -261,15 +264,16 @@ export default function GameScreen({
   const isAIMode = config.opponentMode === 'ai'
   const isOnline = game.isOnline
   const opponentColor = config.playerColor === 'w' ? 'b' : 'w'
-  const aiColor = opponentColor
   const topColor = game.boardFlipped ? config.playerColor : opponentColor
   const bottomColor = game.boardFlipped ? opponentColor : config.playerColor
 
-  const labelForColor = (c: typeof topColor) => {
-    if (isAIMode) return c === config.playerColor ? t.you : 'Stockfish'
-    if (isOnline) return c === config.playerColor ? t.you : (language === 'es' ? 'Rival' : 'Opponent')
-    return getPlayerLabel(c, language)
-  }
+  const labelForColor = usePlayerLabel({
+    playerColor: config.playerColor,
+    language,
+    isAIMode,
+    isOnline,
+    aiName: 'Stockfish',
+  })
 
   const topBar = useMemo(() => {
     const isAI = isAIMode && topColor !== config.playerColor
@@ -282,11 +286,11 @@ export default function GameScreen({
       materialDiff:
         topColor === config.playerColor ? game.materialDiff : -game.materialDiff,
       isActive: game.turn === topColor && !game.gameOver,
-      turnLabel: game.turn === topColor && !game.gameOver ? (language === 'es' ? 'Mueve' : 'To move') : undefined,
+      turnLabel: game.turn === topColor && !game.gameOver ? (ui(language).toMove) : undefined,
       time: config.useTimer ? (topColor === 'w' ? timer.whiteTime : timer.blackTime) : null,
       isLow: config.useTimer ? (topColor === 'w' ? timer.whiteTime : timer.blackTime) < 60 : false,
     }
-  }, [topColor, config, diffMeta, game, timer, isAIMode, isOnline, language, t.you])
+  }, [topColor, config, diffMeta, game, timer, isAIMode, labelForColor, language])
 
   const bottomBar = useMemo(() => {
     const isAI = isAIMode && bottomColor !== config.playerColor
@@ -299,11 +303,11 @@ export default function GameScreen({
       materialDiff:
         bottomColor === config.playerColor ? game.materialDiff : -game.materialDiff,
       isActive: game.turn === bottomColor && !game.gameOver,
-      turnLabel: game.turn === bottomColor && !game.gameOver ? (language === 'es' ? 'Mueve' : 'To move') : undefined,
+      turnLabel: game.turn === bottomColor && !game.gameOver ? (ui(language).toMove) : undefined,
       time: config.useTimer ? (bottomColor === 'w' ? timer.whiteTime : timer.blackTime) : null,
       isLow: config.useTimer ? (bottomColor === 'w' ? timer.whiteTime : timer.blackTime) < 60 : false,
     }
-  }, [bottomColor, config, diffMeta, game, timer, isAIMode, isOnline, language, t.you])
+  }, [bottomColor, config, diffMeta, game, timer, isAIMode, labelForColor, language])
 
   const modeBadge = isAIMode
     ? t.classicModeBadge(diffMeta ? getDifficultyLabel(config.difficulty, language) : '')
@@ -346,12 +350,10 @@ export default function GameScreen({
       priority: 'high',
       message:
         onlineSync.syncError === 'CONFLICT' || onlineSync.syncError === 'OUT_OF_SYNC'
-          ? language === 'es'
-            ? 'Tablero resincronizado con el servidor.'
-            : 'Board resynced with server.'
-          : `${language === 'es' ? 'Error de sincronización: ' : 'Sync error: '}${onlineSync.syncError}`,
+          ? ui(language).boardResyncedWithServer
+          : `${ui(language).syncError}${onlineSync.syncError}`,
       action: {
-        label: language === 'es' ? 'Reconectar' : 'Reconnect',
+        label: ui(language).reconnect,
         onSelect: () => void onlineSync.retryConnection(),
       },
     })
@@ -390,12 +392,12 @@ export default function GameScreen({
     labels: {
       settings: t.settings,
       menu: t.menu,
-      openInspector: language === 'es' ? 'Abrir inspector de partida' : 'Open game inspector',
-      inspectorTitle: language === 'es' ? 'Inspector de partida' : 'Game inspector',
+      openInspector: ui(language).openGameInspector,
+      inspectorTitle: ui(language).gameInspector,
       tabs: {
-        game: language === 'es' ? 'Partida' : 'Game',
-        history: language === 'es' ? 'Historial' : 'History',
-        analysis: language === 'es' ? 'Análisis' : 'Analysis',
+        game: ui(language).game,
+        history: ui(language).history,
+        analysis: ui(language).analysis,
       },
     },
   }
@@ -473,7 +475,7 @@ export default function GameScreen({
           <div className="space-y-5">
             <section>
               <p className="text-ui-xs font-semibold text-neutral-400">
-                {language === 'es' ? 'Estado actual' : 'Current state'}
+                {ui(language).currentState}
               </p>
               <p className="mt-1 text-ui-sm leading-relaxed text-neutral-500">{game.status.text}</p>
             </section>
@@ -481,7 +483,7 @@ export default function GameScreen({
             {actionButtons}
             {isOnline ? (
               <p className="text-ui-xs leading-relaxed text-neutral-600">
-                {language === 'es' ? 'Deshacer no está disponible en partidas en línea.' : 'Undo is unavailable in online games.'}
+                {ui(language).undoUnavailableOnline}
               </p>
             ) : null}
             <div className="rule" />
@@ -501,9 +503,7 @@ export default function GameScreen({
           <div className="space-y-4">
             <EvalBar chances={game.chances} playerColor={config.playerColor} language={language} />
             <p className="text-ui-xs leading-relaxed text-neutral-600">
-              {language === 'es'
-                ? 'La evaluación compara la posición actual desde tu color.'
-                : 'The evaluation compares the current position from your colour.'}
+              {ui(language).evalPerspectiveHint}
             </p>
           </div>
         ),

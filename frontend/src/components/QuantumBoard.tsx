@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback, useRef, useEffect } from 'react'
-import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
+import { m, AnimatePresence, useReducedMotion } from 'framer-motion'
 import Piece from './Piece'
 import { getColorName, getPieceName, ui } from '../lib/i18n'
 import { useBoardPieceDrag, type DragGhostPiece } from '../hooks/useBoardPieceDrag'
@@ -105,7 +105,7 @@ export default function QuantumBoard({
       const selected = (board[selectedPiece.square] ?? []).find((cell) => cell.pieceId === selectedPiece.id)
       const branchCount = Object.values(board).flat().filter((cell) => cell.pieceId === selectedPiece.id).length
       liveRef.current.textContent = selected
-        ? `${getColorName(selected.color, language)} ${getPieceName(selected.type, language)}, ${selectedPiece.square}, ${t.selected}, ${branchCount} ${language === 'es' ? 'ramas' : 'branches'}`
+        ? `${getColorName(selected.color, language)} ${getPieceName(selected.type, language)}, ${selectedPiece.square}, ${t.selected}, ${branchCount} ${ui(language).branches}`
         : `${selectedPiece.square}, ${t.selected}`
       return
     }
@@ -116,7 +116,7 @@ export default function QuantumBoard({
     const cells = board[square] || []
     const parts: string[] = [square]
     if (cells.length === 0) {
-      parts.push(language === 'es' ? 'vacía' : 'empty')
+      parts.push(ui(language).empty)
     } else {
       parts.push(
         cells
@@ -126,7 +126,7 @@ export default function QuantumBoard({
     }
     if (selectedPiece && cells.some((cell) => cell.pieceId === selectedPiece.id)) parts.push(t.selected)
     if (legalTargets.has(square)) parts.push(t.legalMove)
-    if (mergeTargets.has(square)) parts.push(language === 'es' ? 'fusión posible' : 'merge target')
+    if (mergeTargets.has(square)) parts.push(ui(language).mergeTarget)
     if (lastMove?.from === square) parts.push(t.lastMoveFrom)
     if (lastMove?.to === square) parts.push(t.lastMoveTo)
     if (square === checkSquare) parts.push(t.check)
@@ -240,7 +240,7 @@ export default function QuantumBoard({
                   const zIdx = Math.round(cell.probability * 10)
 
                   return (
-                    <motion.div
+                    <m.div
                       key={`${square}-${cell.pieceId}`}
                       className={`pointer-events-none absolute inset-0 flex items-center justify-center ${isQuantum ? 'quantum-piece-glow' : ''}`}
                       style={{
@@ -254,11 +254,11 @@ export default function QuantumBoard({
                       transition={reduceMotion ? { duration: 0 } : { type: 'spring', stiffness: 350, damping: 20 }}
                     >
                       {canDrag && cell.pieceId === myCell?.pieceId ? (
-                        <motion.div
+                        <m.div
                           className="chess-piece-draggable flex h-full w-full items-center justify-center"
                         >
                           <Piece type={cell.type} color={cell.color} animate={false} />
-                        </motion.div>
+                        </m.div>
                       ) : (
                         <Piece type={cell.type} color={cell.color} animate={false} />
                       )}
@@ -267,19 +267,19 @@ export default function QuantumBoard({
                           {Math.round(cell.probability * 100)}%
                         </span>
                       )}
-                    </motion.div>
+                    </m.div>
                   )
                 })}
               </AnimatePresence>
 
               {isLegal && !hasCapturableEnemy && cells.length === 0 && moveMode === 'classical' && (
-                <motion.div className="legal-dot pointer-events-none" initial={reduceMotion ? false : { scale: 0 }} animate={{ scale: 1 }} />
+                <m.div className="legal-dot pointer-events-none" initial={reduceMotion ? false : { scale: 0 }} animate={{ scale: 1 }} />
               )}
               {isLegal && hasCapturableEnemy && moveMode === 'classical' && (
-                <motion.div className="legal-ring pointer-events-none absolute inset-0 m-auto" initial={reduceMotion ? false : { scale: 0, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} />
+                <m.div className="legal-ring pointer-events-none absolute inset-0 m-auto" initial={reduceMotion ? false : { scale: 0, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} />
               )}
               {isLegal && moveMode === 'quantum' && !isFirstQt && (
-                <motion.div className="quantum-dot pointer-events-none" initial={reduceMotion ? false : { scale: 0 }} animate={{ scale: 1 }} />
+                <m.div className="quantum-dot pointer-events-none" initial={reduceMotion ? false : { scale: 0 }} animate={{ scale: 1 }} />
               )}
               {isFirstQt && (
                 <span className="quantum-target-index" aria-hidden>
@@ -292,10 +292,10 @@ export default function QuantumBoard({
                 </span>
               )}
               {isMergeTarget && (
-                <motion.div className="merge-dot pointer-events-none" initial={reduceMotion ? false : { scale: 0 }} animate={{ scale: 1 }} />
+                <m.div className="merge-dot pointer-events-none" initial={reduceMotion ? false : { scale: 0 }} animate={{ scale: 1 }} />
               )}
               {isLegal && cells.length === 0 && moveMode !== 'classical' && moveMode !== 'merge' && !isFirstQt && (
-                <motion.div className="quantum-dot pointer-events-none" initial={reduceMotion ? false : { scale: 0 }} animate={{ scale: 1 }} />
+                <m.div className="quantum-dot pointer-events-none" initial={reduceMotion ? false : { scale: 0 }} animate={{ scale: 1 }} />
               )}
 
               {showFile && (
@@ -313,26 +313,26 @@ export default function QuantumBoard({
         })}
       </div>
 
-      <motion.div ref={ghostRef} className="board-drag-ghost" aria-hidden="true">
+      <m.div ref={ghostRef} className="board-drag-ghost" aria-hidden="true">
         {ghostPiece && <Piece type={ghostPiece.type} color={ghostPiece.color} animate={false} />}
-      </motion.div>
+      </m.div>
 
       <AnimatePresence>
         {isThinking && (
-          <motion.div
+          <m.div
             className="pointer-events-none absolute inset-0 flex items-center justify-center"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
           >
-            <motion.div
+            <m.div
               className="rounded bg-surface-0/80 px-4 py-2 text-ui-sm font-medium text-indigo-400 backdrop-blur-sm"
               animate={reduceMotion ? undefined : { opacity: [0.6, 1, 0.6] }}
               transition={reduceMotion ? undefined : { repeat: Infinity, duration: 1.5 }}
             >
               {t.quantumThinking}
-            </motion.div>
-          </motion.div>
+            </m.div>
+          </m.div>
         )}
       </AnimatePresence>
     </div>

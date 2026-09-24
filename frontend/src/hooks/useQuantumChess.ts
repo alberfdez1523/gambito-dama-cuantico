@@ -13,7 +13,7 @@ import {
 } from '../lib/gameReplay'
 import { pendingMeasurementFromLastMove } from '../lib/onlineTypes'
 import type { QPendingMeasurement } from '../lib/onlineTypes'
-import { getColorName, translateGameOverInfo } from '../lib/i18n'
+import { getColorName, translateGameOverInfo, ui } from '../lib/i18n'
 import type {
   GameConfig, Language, PieceColor, PieceType, Chances, QBoardCell,
   QMoveRecord, QMoveMode, QGameOver, GameOverInfo, QMeasurementEvent,
@@ -56,7 +56,7 @@ function quantumEvalToChances(cp: number): Chances {
 function qGameOverToClassic(qgo: QGameOver, playerColor: PieceColor, language: Language): GameOverInfo {
   if (qgo.winner === null) {
     return {
-      title: language === 'es' ? 'Tablas' : 'Draw',
+      title: ui(language).draw,
       message: language === 'es' ? qgo.reason : 'No legal actions remain',
       result: 'draw',
     }
@@ -70,8 +70,8 @@ function qGameOverToClassic(qgo: QGameOver, playerColor: PieceColor, language: L
         ? 'Black king captured'
         : qgo.reason
   return isWin
-    ? { title: language === 'es' ? '¡Victoria!' : 'Victory!', message: reason, result: 'win' }
-    : { title: language === 'es' ? 'Derrota' : 'Defeat', message: reason, result: 'lose' }
+    ? { title: ui(language).victory, message: reason, result: 'win' }
+    : { title: ui(language).defeat, message: reason, result: 'lose' }
 }
 
 function cloneQState<T>(value: T): T {
@@ -299,37 +299,36 @@ export function useQuantumChess(
       w: engine.getCoherence('w'),
       b: engine.getCoherence('b'),
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [boardVersion, engine])
 
   const status = useMemo(() => {
     if (gameOverInfo) return { text: translateGameOverInfo(gameOverInfo, language).title, type: 'over' as const }
     if (isMeasurementBlocking) {
       return {
-        text: language === 'es' ? 'Medición — gira la ruleta' : 'Measurement — spin the roulette',
+        text: ui(language).measurementSpinTheRoulette,
         type: 'thinking' as const,
       }
     }
     if (isAIMode) {
       if (isThinking) {
         const stageText = {
-          enumerating: language === 'es' ? 'IA enumerando acciones…' : 'AI enumerating actions…',
-          'reply-search': language === 'es' ? 'IA comparando respuestas…' : 'AI comparing replies…',
-          engine: language === 'es' ? 'IA verificando variantes…' : 'AI checking variations…',
-          complete: language === 'es' ? 'IA preparando jugada…' : 'AI preparing move…',
+          enumerating: ui(language).aiEnumeratingActions,
+          'reply-search': ui(language).aiComparingReplies,
+          engine: ui(language).aiCheckingVariations,
+          complete: ui(language).aiPreparingMove,
         }[aiStage]
         return { text: stageText, type: 'thinking' as const }
       }
-      if (turn === config.playerColor) return { text: language === 'es' ? 'Tu turno' : 'Your turn', type: 'player' as const }
-      return { text: language === 'es' ? 'Turno de la IA' : "AI's turn", type: 'ai' as const }
+      if (turn === config.playerColor) return { text: ui(language).yourTurn, type: 'player' as const }
+      return { text: ui(language).aiTurn, type: 'ai' as const }
     }
     if (isOnline) {
       if (turn === config.playerColor) {
-        return { text: language === 'es' ? 'Tu turno' : 'Your turn', type: 'player' as const }
+        return { text: ui(language).yourTurn, type: 'player' as const }
       }
-      return { text: language === 'es' ? 'Turno del rival' : "Opponent's turn", type: 'ai' as const }
+      return { text: ui(language).opponentTurn, type: 'ai' as const }
     }
-    return { text: language === 'es' ? `Turno: ${getColorName(turn, language)}` : `${getColorName(turn, language)} to move`, type: 'player' as const }
+    return { text: ui(language).turnColor(getColorName(turn, language)), type: 'player' as const }
   }, [gameOverInfo, turn, language, isOnline, isAIMode, isThinking, isMeasurementBlocking, config.playerColor, aiStage])
 
   const refresh = useCallback(() => {
@@ -620,9 +619,7 @@ export function useQuantumChess(
         if (err instanceof DOMException && err.name === 'AbortError') return
         console.error('Error IA cuántica:', err)
         setEngineError(
-          language === 'es'
-            ? 'La IA cuántica no pudo calcular una jugada.'
-            : 'Quantum AI could not calculate a move.',
+          ui(language).quantumAiCalcFailed,
         )
       } finally {
         isThinkingRef.current = false
@@ -653,6 +650,7 @@ export function useQuantumChess(
     applyClassicalMoveRecord,
     appendReplayAction,
     aiRetryToken,
+    prepareRng,
   ])
 
   const retryAIMove = useCallback(() => {
@@ -684,7 +682,7 @@ export function useQuantumChess(
     setCapturePending(null)
     setUndoDepth(undoStackRef.current.length)
     setBoardVersion(v => v + 1)
-  }, [capturePending, engine, isOnline])
+  }, [capturePending, config.playerColor, engine, isAIMode, isMeasurementBlocking, isOnline, state.turn])
 
   const handleSquareClick = useCallback((sq: string) => {
     if (capturePending) return
@@ -786,8 +784,8 @@ export function useQuantumChess(
       setFirstQuantumTarget(null)
     }
   }, [
-    board, engine, firstQuantumTarget, gameOver, playCheckIfNeeded,
-    legalTargets, moveMode, pushUndoSnapshot, selectedPiece, sounds, state.turn, isOnline, isAIMode, isMeasurementBlocking, config.playerColor,
+    board, engine, firstQuantumTarget, gameOver,
+    legalTargets, moveMode, prepareRng, pushUndoSnapshot, refresh, selectedPiece, sounds, state.turn, isOnline, isAIMode, isMeasurementBlocking, config.playerColor,
     appendReplayAction, capturePending, executeClassicalAction, queueComplexCapture,
   ])
 
@@ -866,7 +864,7 @@ export function useQuantumChess(
     setSelectedPiece(null)
     setLastMove(null)
     refresh()
-  }, [appendReplayAction, engine, gameOver, pushUndoSnapshot, refresh, sounds, state.turn, isOnline, isAIMode, config.playerColor])
+  }, [appendReplayAction, engine, gameOver, isMeasurementBlocking, prepareRng, pushUndoSnapshot, refresh, sounds, state.turn, isOnline, isAIMode, config.playerColor])
 
   const doClassicalCastle = useCallback((side: 'k' | 'q') => {
     if (gameOver) return
@@ -892,7 +890,7 @@ export function useQuantumChess(
     setMoveMode('classical')
     setCapturePending(null)
     applyClassicalMoveRecord(record, preMove, mover)
-  }, [appendReplayAction, engine, gameOver, pushUndoSnapshot, applyClassicalMoveRecord, state.turn, isOnline, isAIMode, isMeasurementBlocking, config.playerColor])
+  }, [appendReplayAction, engine, gameOver, prepareRng, pushUndoSnapshot, applyClassicalMoveRecord, state.turn, isOnline, isAIMode, isMeasurementBlocking, config.playerColor])
 
   const chooseMoveMode = useCallback((mode: QMoveMode) => {
     if (!availableMoveModes.includes(mode)) return
@@ -906,8 +904,8 @@ export function useQuantumChess(
     if (gameOverInfo) return
     sounds.playGameEnd()
     setGameOverInfo({
-      title: language === 'es' ? 'Rendición' : 'Resignation',
-      message: language === 'es' ? 'Partida terminada por rendición' : 'Game ended by resignation',
+      title: ui(language).resignation,
+      message: ui(language).gameEndedByResignation,
       result: 'lose',
     })
   }, [gameOverInfo, sounds, language])
@@ -917,8 +915,8 @@ export function useQuantumChess(
     sounds.playGameEnd()
     setGameOverInfo(
       color === 'w'
-        ? { title: language === 'es' ? 'Tiempo agotado' : 'Time Out', message: language === 'es' ? 'Ganan negras por tiempo' : 'Black wins on time', result: 'lose' }
-        : { title: language === 'es' ? 'Tiempo agotado' : 'Time Out', message: language === 'es' ? 'Ganan blancas por tiempo' : 'White wins on time', result: 'win' }
+        ? { title: ui(language).timeOut, message: ui(language).blackWinsOnTime, result: 'lose' }
+        : { title: ui(language).timeOut, message: ui(language).whiteWinsOnTime, result: 'win' }
     )
   }, [gameOverInfo, sounds, language])
 

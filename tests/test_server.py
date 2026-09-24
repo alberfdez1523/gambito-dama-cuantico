@@ -50,7 +50,6 @@ def test_move_unavailable_without_engine(client):
 
 
 def test_score_to_eval_centipawns():
-    board = chess.Board(START_FEN)
     score = chess.engine.PovScore(chess.engine.Cp(50), chess.WHITE)
     evaluation, mate = _score_to_eval(score)
     assert evaluation == 50.0

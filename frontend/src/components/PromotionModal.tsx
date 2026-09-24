@@ -1,4 +1,4 @@
-import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
+import { m, AnimatePresence, useReducedMotion } from 'framer-motion'
 import { PROMOTION_PIECES } from '../lib/constants'
 import { getPieceName, ui } from '../lib/i18n'
 import Piece from './Piece'
@@ -19,7 +19,7 @@ export default function PromotionModal({ visible, color, onSelect, language }: P
   return (
     <AnimatePresence>
       {visible && (
-        <motion.div
+        <m.div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -28,7 +28,7 @@ export default function PromotionModal({ visible, color, onSelect, language }: P
           aria-modal="true"
           aria-labelledby={titleId}
         >
-          <motion.div
+          <m.div
             className="rounded-lg border border-surface-4 bg-surface-1 p-6"
             initial={reduceMotion ? false : { scale: 0.9, opacity: 0, y: 16 }}
             animate={{ scale: 1, opacity: 1, y: 0 }}
@@ -55,8 +55,8 @@ export default function PromotionModal({ visible, color, onSelect, language }: P
                 </button>
               ))}
             </div>
-          </motion.div>
-        </motion.div>
+          </m.div>
+        </m.div>
       )}
     </AnimatePresence>
   )

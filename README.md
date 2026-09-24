@@ -68,7 +68,7 @@ flowchart LR
     API --> POOL["Pool Stockfish"]
 ```
 
-- Frontend: React 18, TypeScript, Vite, Tailwind, React Router, Zod e IndexedDB.
+- Frontend: React 18, TypeScript, Vite, Tailwind, React Router, zod/mini, chess.js 1.x e IndexedDB.
 - Backend: FastAPI, contratos Pydantic estrictos, repositorios de progreso/partidas y pool acotado de Stockfish.
 - Datos: migraciones SQL versionadas bajo `supabase/migrations`.
 - Entrega: cada bloque de riesgo se controla mediante feature flags.
@@ -79,10 +79,25 @@ El adaptador API incluido conserva datos en memoria para desarrollo y pruebas. L
 
 Requisitos: Node.js 20+, Python 3.12+ y Stockfish en `PATH` o dentro de `engine/`. Para trabajar sin Stockfish se puede usar `SKIP_STOCKFISH=1`.
 
+**Linux / macOS**
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements-dev.txt
+
+(cd engine/stockfish/src && make -j"$(nproc)" build ARCH=x86-64)   # opcional
+(cd frontend && npm ci && npm run build)
+
+python server.py
+```
+
+**Windows (PowerShell)**
+
 ```powershell
 py -m venv .venv
 .venv\Scripts\Activate.ps1
-pip install -r requirements.txt
+pip install -r requirements-dev.txt
 
 Set-Location frontend
 npm ci
@@ -92,14 +107,16 @@ Set-Location ..
 python server.py
 ```
 
-La aplicación compilada queda servida en `http://localhost:8000`. Para hot reload:
+La aplicación compilada queda servida en `http://localhost:8000`. Para hot reload, `cd frontend && npm run dev` abre `http://localhost:5173` y proxifica `/api` y `/music` al backend.
 
-```powershell
-Set-Location frontend
-npm run dev
+### Docker
+
+```bash
+docker build -t gambito .
+docker run --rm -p 8000:8000 gambito
 ```
 
-Vite abre `http://localhost:5173` y proxifica `/api` al backend configurado.
+La imagen compila Stockfish (descarga su red NNUE y verifica el binario con `bench`), construye el frontend y ejecuta el servidor como usuario sin privilegios. Las variables públicas de Vite se pasan con `--build-arg VITE_SUPABASE_URL=... --build-arg VITE_SUPABASE_ANON_KEY=...`.
 
 ## Configuración
 
@@ -110,54 +127,67 @@ Variables principales:
 - `SUPABASE_URL` y `SUPABASE_PUBLISHABLE_KEY`: verificación de JWT en la API.
 - `VITE_SUPABASE_URL` y `VITE_SUPABASE_ANON_KEY`: Auth/Realtime desde el navegador.
 - `STOCKFISH_POOL_SIZE` y `STOCKFISH_QUEUE_TIMEOUT`: capacidad y espera del pool.
+- `RATE_LIMIT_ENGINE_PER_MINUTE`, `RATE_LIMIT_ANALYTICS_PER_MINUTE`, `RATE_LIMIT_API_PER_MINUTE`: límites por IP (`RATE_LIMIT_ENABLED=0` los desactiva).
+- `FORWARDED_ALLOW_IPS`: proxies de confianza para `X-Forwarded-For` (`*` detrás de Render o Docker con proxy delante).
+- `CORS_ORIGINS`: orígenes permitidos separados por comas; vacío significa solo mismo origen.
 - `VITE_SUPPORTER_CHECKOUT_URL`: URL HTTPS de Stripe Checkout; solo se usa con su flag activo.
 - `FEATURE_AUTHORITATIVE_QUANTUM`: mantiene apagadas las acciones cuánticas online hasta completar el núcleo compartido y la prueba de carga.
 
 Los valores y defaults completos están en los dos archivos de ejemplo.
 
+## Seguridad
+
+- El servidor solo sirve archivos que, una vez resueltos, quedan dentro de `frontend/dist` o `music/`.
+- Los endpoints que consumen Stockfish, el coach, la analítica y la API v1 tienen límite de peticiones por IP (en memoria; con varias instancias hay que moverlo a un almacén compartido).
+- Los payloads cuánticos están acotados (piezas, casillas, universos, profundidad y combinaciones exploradas).
+- En el lobby online heredado, unirse a una sala pasa por la RPC `join_room_by_code`: las salas en espera no son legibles por terceros. Un trigger impide robar asientos, retroceder la versión, mover en el turno del rival o elegir la semilla de medición, que ahora genera Postgres. El modelo sigue siendo cliente-autoritativo; el competitivo debe usar `matches` y la API autoritativa.
+
 ## Migraciones Supabase
 
-Las migraciones crean perfiles, eventos de progreso, dominio, logros, retos, partidas, eventos de partida, ratings, entitlements, analítica consentida y replays terminados. La escritura de progreso y partidas se reserva al rol de servicio; el cliente autenticado recibe políticas de lectura sobre sus propios datos.
+Las migraciones crean perfiles, eventos de progreso, dominio, logros, retos, partidas, eventos de partida, ratings, entitlements, analítica consentida, replays terminados y las RPC del lobby (`join_room_by_code`, `abandon_room`, `cleanup_stale_rooms`). La escritura de progreso y partidas se reserva al rol de servicio; el cliente autenticado recibe políticas de lectura sobre sus propios datos.
 
-```powershell
-npx supabase@2.113.0 db reset
+```bash
+npx supabase@2.113.0 db reset   # requiere Docker
 ```
 
-El comando requiere Docker para la base local. En este entorno se validó la CLI y el SQL se revisó, pero no se ejecutó `db reset` porque Docker no está instalado.
+`npm test` aplica todas las migraciones sobre Postgres embebido (PGlite) y comprueba las políticas de las salas online, así que el SQL se valida en CI aunque no haya Docker.
 
 ## Verificación
 
-```powershell
+```bash
 # Backend
-python -m pytest -q
+ruff check .
+SKIP_STOCKFISH=1 pytest -q
 
-# Frontend unitario y build
-Set-Location frontend
-npm test
+# Frontend
+cd frontend
+npm run lint          # ESLint sin avisos permitidos
+npm run typecheck
+npm test              # unitarias + migraciones sobre PGlite
 npm run build
+npm run check:bundle  # entrada inicial < 150 kB gzip
 
-# Matriz E2E: Chromium, Firefox y WebKit
-npm run e2e
-
-# Build PWA real y recarga offline
-npm run e2e:pwa
-
-# Gates de entrega apagados
-npm run e2e:flags
+# E2E
+npm run e2e           # Chromium, Firefox y WebKit
+npm run e2e:pwa       # build PWA real y recarga offline
+npm run e2e:flags     # gates de entrega apagados
 ```
 
-Playwright usa un worker para que la matriz con Web Workers y múltiples viewports sea determinista en CI de pocos recursos. Los E2E cubren 320×568, 390×844, 768×1024, 1280×720 y 1440×900, teclado, movimiento reducido, persistencia, modos avanzados y Academia.
+Si el Chromium instalado no coincide con la versión de Playwright, `PW_CHROMIUM_PATH=/ruta/a/chrome` lo usa en lugar de descargar otro.
+
+CI ejecuta lint, typecheck, pruebas unitarias, build, presupuesto de bundle, E2E en Chromium (más PWA y flags), ruff y pytest.
 
 Baseline verificada de esta entrega:
 
-- 71 pruebas unitarias frontend.
-- 18 pruebas backend.
-- 60 recorridos E2E: 20 en cada motor de navegador, más dos pruebas PWA de producción y una de gates apagados.
-- Build de producción correcto y entrada crítica de ~133,9 kB gzip (JS + CSS), por debajo de 150 kB.
+- 82 pruebas unitarias frontend (incluidas las de migraciones SQL).
+- 32 pruebas backend.
+- 27 recorridos E2E en Chromium (incluye 5 auditorías axe WCAG 2.1 AA), más dos pruebas PWA de producción y una de gates apagados.
+- Entrada crítica de ~118 kB gzip (JS + CSS); precarga PWA de ~945 kB.
+- `npm audit`: 0 vulnerabilidades.
 
 ## Estado de lanzamiento
 
-La experiencia local, Academia, PWA, Coherencia limitada local/IA, replays y análisis están implementados. El online cuántico autoritativo y el competitivo aún no se exponen; el servidor mantiene su gate cuántico cerrado hasta completar núcleo compartido, carga y beta. La membresía sí está preparada tras un flag y una URL válida de Checkout. Véase [IMPLEMENTATION_STATUS.md](IMPLEMENTATION_STATUS.md).
+La experiencia local, Academia, PWA, Coherencia limitada local/IA, replays y análisis están implementados. El online cuántico autoritativo y el competitivo aún no se exponen; el servidor mantiene su gate cuántico cerrado hasta completar núcleo compartido, carga y beta. La membresía sí está preparada tras un flag y una URL válida de Checkout. Véase [docs/STATUS.md](docs/STATUS.md) y el detalle en [docs/IMPLEMENTACION_Y_PENDIENTES.txt](docs/IMPLEMENTACION_Y_PENDIENTES.txt).
 
 ## Licencia
 

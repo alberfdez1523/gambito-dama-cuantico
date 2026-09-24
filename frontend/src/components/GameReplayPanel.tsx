@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type CSSProperties } from 'react'
-import { Chess } from 'chess.js'
-import { motion, useReducedMotion } from 'framer-motion'
+import { Chess, type Square } from 'chess.js'
+import { m, useReducedMotion } from 'framer-motion'
 import type {
   CoherenceLimit,
   Language,
@@ -199,7 +199,7 @@ export default function GameReplayPanel(props: ReplayProps) {
     : []
 
   return (
-    <motion.div
+    <m.div
       className="fixed inset-0 z-[90] flex items-end justify-center bg-black/80 p-0 backdrop-blur-sm sm:items-center sm:p-4"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
@@ -207,7 +207,7 @@ export default function GameReplayPanel(props: ReplayProps) {
       onClick={onBackdropClick}
       role="presentation"
     >
-      <motion.section
+      <m.section
         ref={containerRef}
         role="dialog"
         aria-modal="true"
@@ -367,8 +367,8 @@ export default function GameReplayPanel(props: ReplayProps) {
             <ReplayButton icon="chevron" label={es ? 'Siguiente' : 'Next'} disabled={index >= maxIndex} onClick={() => go(index + 1)} />
           </div>
         </footer>
-      </motion.section>
-    </motion.div>
+      </m.section>
+    </m.div>
   )
 }
 
@@ -377,7 +377,7 @@ function ClassicReplayBoard({ frame, language, flipped }: { frame?: ClassicFrame
   const turn = game.turn() as PieceColor
   const passiveColor: PieceColor = turn === 'w' ? 'b' : 'w'
   const getPiece = (square: string) => {
-    const piece = game.get(square)
+    const piece = game.get(square as Square)
     return piece ? { type: piece.type as PieceType, color: piece.color as PieceColor } : null
   }
   return (

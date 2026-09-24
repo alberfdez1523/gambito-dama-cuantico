@@ -1,0 +1,14 @@
+line-length = 130
+target-version = "py312"
+extend-exclude = ["engine", "frontend"]
+
+[lint]
+select = ["E", "F", "W", "I", "B", "UP", "S"]
+ignore = [
+  "S101",  # assert en pruebas
+  "S104",  # el servidor escucha en 0.0.0.0 a propósito (contenedores)
+  "B008",  # Query()/Depends() en valores por defecto es el idioma de FastAPI
+]
+
+[lint.per-file-ignores]
+"tests/*" = ["S", "E402"]

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { motion } from 'framer-motion'
+import { m } from 'framer-motion'
 import type { PieceGuideEntry } from './types'
 import MiniBoard from './MiniBoard'
 import { useMiniSqPx } from './useMiniSqPx'
@@ -42,7 +42,7 @@ export default function PieceExplorer({ pieces, es }: PieceExplorerProps) {
         ))}
       </div>
 
-      <motion.div
+      <m.div
         key={active.id}
         className="mt-6 flex flex-col items-center gap-4 rounded-lg border border-surface-4 bg-surface-2/50 p-5 sm:flex-row sm:items-start sm:gap-8"
         initial={{ opacity: 0, y: 8 }}
@@ -61,7 +61,7 @@ export default function PieceExplorer({ pieces, es }: PieceExplorerProps) {
             {es ? 'Casillas a las que puede ir' : 'Squares it can reach'}
           </p>
         </div>
-      </motion.div>
+      </m.div>
     </section>
   )
 }

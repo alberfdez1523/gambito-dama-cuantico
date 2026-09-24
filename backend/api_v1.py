@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import os
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import date, datetime
-from typing import Annotated, Any, Callable, Literal
+from typing import Annotated, Any, Literal
 from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, Query, Request, Response
@@ -14,7 +15,6 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from .academy_service import AcademyRepository
 from .auth import AuthenticationError, token_verifier
 from .match_service import MatchRepository, MatchServiceError
-
 
 RulesetId = Literal["classic", "quantum-standard", "quantum-coherence"]
 CourseId = Literal["classic", "quantum"]
@@ -44,7 +44,7 @@ class AttemptEventModel(APIModel):
     validated_online: bool = False
 
     @model_validator(mode="after")
-    def completion_follows_start(self) -> "AttemptEventModel":
+    def completion_follows_start(self) -> AttemptEventModel:
         if self.completed_at < self.started_at:
             raise ValueError("completedAt must not precede startedAt")
         return self
@@ -78,7 +78,7 @@ class FinishedReplayModel(APIModel):
     options: dict[str, Any] = Field(default_factory=dict)
 
     @model_validator(mode="after")
-    def validate_replay_shape(self) -> "FinishedReplayModel":
+    def validate_replay_shape(self) -> FinishedReplayModel:
         if self.ruleset_id == "classic" and self.initial_state is not None:
             raise ValueError("Classic replays must not include an initialState")
         if self.ruleset_id != "classic" and (self.initial_state is None or self.final_hash is None):

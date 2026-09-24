@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { m, AnimatePresence } from 'framer-motion'
 import type { Language } from '../lib/types'
 import type { RuleCategory } from './rules/types'
 import RuleCard from './rules/RuleCard'
@@ -109,15 +109,15 @@ export default function RulesScreen({ onBack, language, initialTab = 'quantum' }
         : 'Quantum chess'
 
   return (
-    <motion.div className="min-h-screen bg-surface-0">
+    <m.div className="min-h-screen bg-surface-0">
       <header className="sticky top-0 z-30 border-b border-surface-4 bg-surface-0/95 backdrop-blur-sm">
-        <motion.div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 lg:px-8">
-          <motion.div className="flex items-center gap-2.5">
+        <m.div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 lg:px-8">
+          <m.div className="flex items-center gap-2.5">
             <GameIcon name="queen" className="h-5 w-5 text-accent" />
             <span className="text-ui-sm font-semibold text-white">
               Gambito de Dama <span className="text-accent">Cuántico</span>
             </span>
-          </motion.div>
+          </m.div>
           <button
             type="button"
             onClick={onBack}
@@ -128,10 +128,10 @@ export default function RulesScreen({ onBack, language, initialTab = 'quantum' }
               {es ? 'Menú' : 'Menu'}
             </span>
           </button>
-        </motion.div>
+        </m.div>
       </header>
 
-      <motion.div className="mx-auto max-w-6xl px-4 py-8 lg:flex lg:gap-10 lg:px-8 lg:py-12">
+      <m.div className="mx-auto max-w-6xl px-4 py-8 lg:flex lg:gap-10 lg:px-8 lg:py-12">
         <nav
           className="rules-toc hidden lg:block lg:w-52 lg:flex-shrink-0"
           aria-label={es ? 'Índice de reglas' : 'Rules index'}
@@ -157,7 +157,7 @@ export default function RulesScreen({ onBack, language, initialTab = 'quantum' }
         </nav>
 
         <main className="min-w-0 flex-1">
-          <motion.div
+          <m.div
             className="mb-8 text-center lg:text-left"
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
@@ -170,10 +170,10 @@ export default function RulesScreen({ onBack, language, initialTab = 'quantum' }
                 ? 'Aprende con ejemplos interactivos paso a paso'
                 : 'Learn with step-by-step interactive examples'}
             </p>
-          </motion.div>
+          </m.div>
 
-          <motion.div className="mb-8 flex justify-center lg:justify-start">
-            <motion.div
+          <m.div className="mb-8 flex justify-center lg:justify-start">
+            <m.div
               role="tablist"
               aria-label={es ? 'Contenido de aprendizaje' : 'Learning content'}
               className="flex rounded-lg bg-surface-2 p-1"
@@ -209,12 +209,12 @@ export default function RulesScreen({ onBack, language, initialTab = 'quantum' }
                   </span>
                 </button>
               ))}
-            </motion.div>
-          </motion.div>
+            </m.div>
+          </m.div>
 
           {!isTutorial && (
             <AnimatePresence mode="wait">
-            <motion.div
+            <m.div
               key={tab}
               className="rules-quickstart mb-10"
               initial={{ opacity: 0, y: 8 }}
@@ -224,19 +224,19 @@ export default function RulesScreen({ onBack, language, initialTab = 'quantum' }
               <h2 className="mb-3 text-ui-xs font-semibold uppercase tracking-wider text-neutral-600">
                 {es ? 'Resumen rápido' : 'Quick summary'} — {tabTitle}
               </h2>
-              <motion.div className="divide-y divide-line/70 border-y border-line/70">
+              <m.div className="divide-y divide-line/70 border-y border-line/70">
                 {quickStart.map((item) => (
-                  <motion.div key={item.text} className="flex items-center gap-3 py-3">
+                  <m.div key={item.text} className="flex items-center gap-3 py-3">
                     <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-quantum" aria-hidden="true" />
                     <p className="text-ui-sm text-neutral-300">{item.text}</p>
-                  </motion.div>
+                  </m.div>
                 ))}
-              </motion.div>
-            </motion.div>
+              </m.div>
+            </m.div>
             </AnimatePresence>
           )}
 
-          <motion.div className="rules-toc-mobile mb-8 lg:hidden">
+          <m.div className="rules-toc-mobile mb-8 lg:hidden">
             <label htmlFor="rules-jump" className="mb-2 block text-ui-xs text-neutral-600">
               {es ? 'Ir a sección' : 'Jump to section'}
             </label>
@@ -255,10 +255,10 @@ export default function RulesScreen({ onBack, language, initialTab = 'quantum' }
                 </option>
               ))}
             </select>
-          </motion.div>
+          </m.div>
 
           <AnimatePresence mode="wait">
-            <motion.div
+            <m.div
               key={tab}
               initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
@@ -275,7 +275,7 @@ export default function RulesScreen({ onBack, language, initialTab = 'quantum' }
                       <h2 id={`cat-${category}`} className="rules-category-title mb-4">
                         {categoryLabels[category]}
                       </h2>
-                      <motion.div className="space-y-4">
+                      <m.div className="space-y-4">
                         {catRules.map((rule, idx) => (
                           <RuleCard
                             key={rule.id}
@@ -286,32 +286,32 @@ export default function RulesScreen({ onBack, language, initialTab = 'quantum' }
                             defaultOpen={idx === 0 && category === 'intro'}
                           />
                         ))}
-                      </motion.div>
+                      </m.div>
                     </section>
                   ))}
 
                   {tab === 'classic' ? (
-                    <motion.div id="piece-explorer">
+                    <m.div id="piece-explorer">
                       <PieceExplorer pieces={pieceGuide} es={es} />
-                    </motion.div>
+                    </m.div>
                   ) : (
                     <>
-                      <motion.div id="capture-lab">
+                      <m.div id="capture-lab">
                         <CaptureFlowLab scenarios={captureScenarios} es={es} />
-                      </motion.div>
-                      <motion.div id="glossary">
+                      </m.div>
+                      <m.div id="glossary">
                         <Glossary items={glossary} es={es} />
-                      </motion.div>
+                      </m.div>
                     </>
                   )}
                 </>
               )}
-            </motion.div>
+            </m.div>
           </AnimatePresence>
 
-          <motion.div className="h-16" />
+          <m.div className="h-16" />
         </main>
-      </motion.div>
-    </motion.div>
+      </m.div>
+    </m.div>
   )
 }

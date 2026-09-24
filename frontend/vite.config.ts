@@ -54,7 +54,19 @@ export default defineConfig({
         navigateFallback: '/index.html',
         navigateFallbackDenylist: [/^\/api\//, /^\/music\//],
         globPatterns: ['**/*.{js,css,html,svg,png,woff2,json}'],
+        // El cliente de Supabase y el lobby solo sirven con conexión: no se
+        // precargan en la instalación y se cachean la primera vez que se usan.
+        globIgnores: ['**/supabase-*.js', '**/onlineRoom-*.js'],
         runtimeCaching: [
+          {
+            urlPattern: /\/assets\/(supabase|onlineRoom)-[\w-]+\.js$/,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'online-chunks-v1',
+              expiration: { maxEntries: 8, maxAgeSeconds: 30 * 24 * 60 * 60 },
+              cacheableResponse: { statuses: [0, 200] },
+            },
+          },
           {
             urlPattern: /\/music\//,
             handler: 'CacheFirst',
@@ -70,7 +82,8 @@ export default defineConfig({
   ],
   test: {
     environment: 'node',
-    include: ['src/**/*.test.ts'],
+    include: ['src/**/*.test.ts', 'db-tests/**/*.test.ts'],
+    testTimeout: 30_000,
   },
   server: {
     port: 5173,

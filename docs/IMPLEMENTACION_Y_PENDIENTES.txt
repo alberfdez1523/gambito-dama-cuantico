@@ -946,8 +946,8 @@ Documentación:
 - README.md
 - PRODUCT.md
 - DESIGN.md
-- IMPLEMENTATION_STATUS.md
-- IMPLEMENTACION_Y_PREPARACION_PENDIENTES.txt
+- docs/STATUS.md
+- docs/IMPLEMENTACION_Y_PENDIENTES.txt
 
 Frontend principal:
 

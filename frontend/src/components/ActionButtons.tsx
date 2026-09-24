@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { AnimatePresence, motion } from 'framer-motion'
+import { AnimatePresence, m } from 'framer-motion'
 import type { Language } from '../lib/types'
 import { ui } from '../lib/i18n'
 import { useModalA11y } from '../hooks/useModalA11y'
@@ -76,7 +76,7 @@ export default function ActionButtons({
 
       <AnimatePresence>
         {confirmResign && (
-          <motion.div
+          <m.div
             className="fixed inset-0 z-[65] flex items-center justify-center bg-black/70 px-4 backdrop-blur-sm"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -84,7 +84,7 @@ export default function ActionButtons({
             onClick={onBackdropClick}
             role="presentation"
           >
-            <motion.div
+            <m.div
               ref={containerRef}
               role="dialog"
               aria-modal="true"
@@ -115,8 +115,8 @@ export default function ActionButtons({
                   {t.cancel}
                 </button>
               </div>
-            </motion.div>
-          </motion.div>
+            </m.div>
+          </m.div>
         )}
       </AnimatePresence>
     </>

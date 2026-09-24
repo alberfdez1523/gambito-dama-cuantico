@@ -1,6 +1,6 @@
 # Estado de implementación
 
-Fecha de corte: 12 de agosto de 2026.
+Fecha de corte: 24 de septiembre de 2026.
 
 | Área | Estado | Evidencia o condición |
 |---|---|---|
@@ -12,7 +12,9 @@ Fecha de corte: 12 de agosto de 2026.
 | Cuenta y progreso local-first | Implementado | Invitado persistente, IndexedDB, magic link/Google opcionales y cola append-only |
 | Replays y análisis | Implementado | Acciones neutrales, mediciones reproducibles, análisis clásico/cuántico y laboratorio ramificado |
 | API v1 | Implementado | Progreso, recomendación, coach, diario, replay, analítica, partidas, exportación y borrado |
-| Esquema Supabase y RLS | Implementado en repositorio | Tres migraciones versionadas; falta aplicarlas y probarlas contra el proyecto de destino |
+| Esquema Supabase y RLS | Implementado en repositorio | Cinco migraciones versionadas, probadas en CI sobre PGlite; falta aplicarlas al proyecto de destino |
+| Lobby online heredado | Endurecido | RPC de unión/abandono/limpieza, trigger de guardia y semilla generada en Postgres; sigue siendo cliente-autoritativo |
+| Límites de uso de la API | Implementado (por proceso) | Límite por IP en memoria; con varias instancias necesita un almacén compartido |
 | Persistencia API en Supabase | Preparado, no conectado | El adaptador local es en memoria; producción debe implementar el repositorio con `service_role` |
 | Online clásico autoritativo | Contrato/beta técnica | Servicio de acciones disponible; el lobby legado sigue durante la transición |
 | Online cuántico autoritativo | No expuesto; gate de servidor cerrado | Requiere núcleo TS compartido en servidor y simulación concurrente sin divergencias |
@@ -32,10 +34,10 @@ Fecha de corte: 12 de agosto de 2026.
 ## Verificación completada
 
 - `npm ci`: lockfile reproducible.
-- Frontend unitario: 71 pruebas aprobadas.
-- Backend: 18 pruebas aprobadas.
-- E2E: 20 Chromium + 20 Firefox + 20 WebKit aprobadas en serie, más dos pruebas PWA de producción y una de gates apagados.
-- Build: TypeScript y Vite correctos; entrada crítica ~133,9 kB gzip sumando JS y CSS.
-- Seguridad de contrato: deduplicación UUID, rechazo de snapshots/acciones inválidas, analítica con allow-list y RLS definida.
+- Frontend: ESLint sin avisos, typecheck y 82 pruebas unitarias (incluye la aplicación de todas las migraciones sobre PGlite y las políticas del lobby).
+- Backend: ruff y 32 pruebas (incluye path traversal, límite de peticiones y límites de payload cuántico).
+- E2E: 27 recorridos en Chromium (5 son auditorías axe WCAG 2.1 AA), más dos pruebas PWA de producción y una de gates apagados. La matriz Firefox/WebKit se mantiene en `npm run e2e`, pero no se ha vuelto a ejecutar tras estos cambios.
+- Build: entrada crítica ~118 kB gzip (JS + CSS), vigilada en CI con un presupuesto de 150 kB; precarga PWA ~945 kB.
+- Docker: la imagen se construye y sirve la app como usuario sin privilegios; el build falla si Stockfish no tiene su red NNUE.
 
 No se declara listo el competitivo: las pruebas locales validan el código entregado, pero no sustituyen aplicar las migraciones, carga real ni beta operativa.
