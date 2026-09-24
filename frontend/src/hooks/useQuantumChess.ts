@@ -299,7 +299,6 @@ export function useQuantumChess(
       w: engine.getCoherence('w'),
       b: engine.getCoherence('b'),
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [boardVersion, engine])
 
   const status = useMemo(() => {
@@ -653,6 +652,7 @@ export function useQuantumChess(
     applyClassicalMoveRecord,
     appendReplayAction,
     aiRetryToken,
+    prepareRng,
   ])
 
   const retryAIMove = useCallback(() => {
@@ -684,7 +684,7 @@ export function useQuantumChess(
     setCapturePending(null)
     setUndoDepth(undoStackRef.current.length)
     setBoardVersion(v => v + 1)
-  }, [capturePending, engine, isOnline])
+  }, [capturePending, config.playerColor, engine, isAIMode, isMeasurementBlocking, isOnline, state.turn])
 
   const handleSquareClick = useCallback((sq: string) => {
     if (capturePending) return
@@ -786,8 +786,8 @@ export function useQuantumChess(
       setFirstQuantumTarget(null)
     }
   }, [
-    board, engine, firstQuantumTarget, gameOver, playCheckIfNeeded,
-    legalTargets, moveMode, pushUndoSnapshot, selectedPiece, sounds, state.turn, isOnline, isAIMode, isMeasurementBlocking, config.playerColor,
+    board, engine, firstQuantumTarget, gameOver,
+    legalTargets, moveMode, prepareRng, pushUndoSnapshot, refresh, selectedPiece, sounds, state.turn, isOnline, isAIMode, isMeasurementBlocking, config.playerColor,
     appendReplayAction, capturePending, executeClassicalAction, queueComplexCapture,
   ])
 
@@ -866,7 +866,7 @@ export function useQuantumChess(
     setSelectedPiece(null)
     setLastMove(null)
     refresh()
-  }, [appendReplayAction, engine, gameOver, pushUndoSnapshot, refresh, sounds, state.turn, isOnline, isAIMode, config.playerColor])
+  }, [appendReplayAction, engine, gameOver, isMeasurementBlocking, prepareRng, pushUndoSnapshot, refresh, sounds, state.turn, isOnline, isAIMode, config.playerColor])
 
   const doClassicalCastle = useCallback((side: 'k' | 'q') => {
     if (gameOver) return
@@ -892,7 +892,7 @@ export function useQuantumChess(
     setMoveMode('classical')
     setCapturePending(null)
     applyClassicalMoveRecord(record, preMove, mover)
-  }, [appendReplayAction, engine, gameOver, pushUndoSnapshot, applyClassicalMoveRecord, state.turn, isOnline, isAIMode, isMeasurementBlocking, config.playerColor])
+  }, [appendReplayAction, engine, gameOver, prepareRng, pushUndoSnapshot, applyClassicalMoveRecord, state.turn, isOnline, isAIMode, isMeasurementBlocking, config.playerColor])
 
   const chooseMoveMode = useCallback((mode: QMoveMode) => {
     if (!availableMoveModes.includes(mode)) return

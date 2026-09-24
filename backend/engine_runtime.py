@@ -6,8 +6,9 @@ import os
 import pathlib
 import platform
 import shutil
+from collections.abc import Callable
 from concurrent.futures import CancelledError
-from typing import Callable, Literal, TypeVar
+from typing import Literal, TypeVar
 
 import chess
 import chess.engine

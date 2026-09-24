@@ -19,7 +19,7 @@ import { useTimer } from '../hooks/useTimer'
 import { DIFFICULTIES } from '../lib/constants'
 import { getDifficultyLabel, getPlayerLabel, ui } from '../lib/i18n'
 import type { AppSettings } from '../lib/settings'
-import type { GameConfig, GameResult, Language } from '../lib/types'
+import type { GameConfig, GameResult, Language, PieceColor } from '../lib/types'
 import type { GameChromeModel, GameNotice, GameTone } from '../lib/gamePresentation'
 import { gameAutosave, type GameAutosave } from '../lib/gameAutosave'
 import { classicResultFromFen } from '../lib/onlineRoom'
@@ -132,6 +132,8 @@ export default function GameScreen({
       timer.restore(resumeAutosave.clocks)
     }
     setResumeHydrated(true)
+    // `game` y `timer` cambian en cada render; sus métodos usados aquí son estables.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [config.gameMode, config.opponentMode, config.playerColor, game.loadFen, resumeAutosave, timer.restore])
 
   useEffect(() => {
@@ -261,15 +263,14 @@ export default function GameScreen({
   const isAIMode = config.opponentMode === 'ai'
   const isOnline = game.isOnline
   const opponentColor = config.playerColor === 'w' ? 'b' : 'w'
-  const aiColor = opponentColor
   const topColor = game.boardFlipped ? config.playerColor : opponentColor
   const bottomColor = game.boardFlipped ? opponentColor : config.playerColor
 
-  const labelForColor = (c: typeof topColor) => {
+  const labelForColor = useCallback((c: PieceColor) => {
     if (isAIMode) return c === config.playerColor ? t.you : 'Stockfish'
     if (isOnline) return c === config.playerColor ? t.you : (language === 'es' ? 'Rival' : 'Opponent')
     return getPlayerLabel(c, language)
-  }
+  }, [config.playerColor, isAIMode, isOnline, language, t.you])
 
   const topBar = useMemo(() => {
     const isAI = isAIMode && topColor !== config.playerColor
@@ -286,7 +287,7 @@ export default function GameScreen({
       time: config.useTimer ? (topColor === 'w' ? timer.whiteTime : timer.blackTime) : null,
       isLow: config.useTimer ? (topColor === 'w' ? timer.whiteTime : timer.blackTime) < 60 : false,
     }
-  }, [topColor, config, diffMeta, game, timer, isAIMode, isOnline, language, t.you])
+  }, [topColor, config, diffMeta, game, timer, isAIMode, labelForColor, language])
 
   const bottomBar = useMemo(() => {
     const isAI = isAIMode && bottomColor !== config.playerColor
@@ -303,7 +304,7 @@ export default function GameScreen({
       time: config.useTimer ? (bottomColor === 'w' ? timer.whiteTime : timer.blackTime) : null,
       isLow: config.useTimer ? (bottomColor === 'w' ? timer.whiteTime : timer.blackTime) < 60 : false,
     }
-  }, [bottomColor, config, diffMeta, game, timer, isAIMode, isOnline, language, t.you])
+  }, [bottomColor, config, diffMeta, game, timer, isAIMode, labelForColor, language])
 
   const modeBadge = isAIMode
     ? t.classicModeBadge(diffMeta ? getDifficultyLabel(config.difficulty, language) : '')

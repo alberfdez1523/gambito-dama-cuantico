@@ -67,10 +67,8 @@ function joinCodeFromPath(pathname: string): string | null {
 }
 
 function ScreenLoadingFallback({
-  language,
   label,
 }: {
-  language: AppSettings['language']
   label: string
 }) {
   return (
@@ -369,7 +367,6 @@ export default function App() {
             <Suspense
               fallback={
                 <ScreenLoadingFallback
-                  language={language}
                   label={language === 'es' ? 'Abriendo sala...' : 'Opening room...'}
                 />
               }
@@ -393,7 +390,7 @@ export default function App() {
           </div>
         ) : screen === 'rules' ? (
           <div key="rules" className="screen-enter">
-            <Suspense fallback={<ScreenLoadingFallback language={language} label={ui(language).loadingRules} />}>
+            <Suspense fallback={<ScreenLoadingFallback label={ui(language).loadingRules} />}>
               <RulesScreen
                 onBack={() => { setScreen('menu'); navigate('/') }}
                 language={language}
@@ -403,7 +400,7 @@ export default function App() {
           </div>
         ) : screen === 'academy' ? (
           <div key="academy" className="screen-enter">
-            <Suspense fallback={<ScreenLoadingFallback language={language} label={language === 'es' ? 'Abriendo la Academia...' : 'Opening Academy...'} />}>
+            <Suspense fallback={<ScreenLoadingFallback label={language === 'es' ? 'Abriendo la Academia...' : 'Opening Academy...'} />}>
               <AcademyScreen
                 language={language}
                 academy={academy}
@@ -423,7 +420,7 @@ export default function App() {
           </div>
         ) : screen === 'lesson' && activeLesson ? (
           <div key={`lesson-${activeLesson.id}`} className="screen-enter">
-            <Suspense fallback={<ScreenLoadingFallback language={language} label={language === 'es' ? 'Preparando actividad...' : 'Preparing activity...'} />}>
+            <Suspense fallback={<ScreenLoadingFallback label={language === 'es' ? 'Preparando actividad...' : 'Preparing activity...'} />}>
               <LessonScreen
                 lesson={activeLesson}
                 language={language}
@@ -439,7 +436,7 @@ export default function App() {
           </div>
         ) : screen === 'sprint' ? (
           <div key={`sprint-${location.pathname}`} className="screen-enter">
-            <Suspense fallback={<ScreenLoadingFallback language={language} label="Puzzle Sprint..." />}>
+            <Suspense fallback={<ScreenLoadingFallback label="Puzzle Sprint..." />}>
               <PuzzleSprintScreen
                 minutes={sprintMinutesFromPath(location.pathname)}
                 course={academy.progress.selectedCourse}
@@ -451,7 +448,7 @@ export default function App() {
           </div>
         ) : screen === 'profile' ? (
           <div key="profile" className="screen-enter">
-            <Suspense fallback={<ScreenLoadingFallback language={language} label={language === 'es' ? 'Cargando perfil...' : 'Loading profile...'} />}>
+            <Suspense fallback={<ScreenLoadingFallback label={language === 'es' ? 'Cargando perfil...' : 'Loading profile...'} />}>
               <ProfileScreen
                 language={language}
                 academy={academy}
@@ -465,7 +462,6 @@ export default function App() {
             <Suspense
               fallback={
                 <ScreenLoadingFallback
-                  language={language}
                   label={language === 'es' ? 'Cargando partida...' : 'Loading game...'}
                 />
               }

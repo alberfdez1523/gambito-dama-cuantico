@@ -24,7 +24,6 @@ import type { AppSettings } from '../lib/settings'
 import {
   onlineResultToGameOverInfo,
   quantumRoomFingerprint,
-  quantumStateFingerprint,
 } from '../lib/onlineTypes'
 import type { GameConfig, GameResult, Language, PieceColor, PieceType, QMoveMode, QState } from '../lib/types'
 import type { GameChromeModel, GameNotice, GameTone } from '../lib/gamePresentation'
@@ -203,6 +202,8 @@ export default function QuantumGameScreen({
       timer.restore(resumeAutosave.clocks)
     }
     setResumeHydrated(true)
+    // `game` y `timer` cambian en cada render; sus métodos usados aquí son estables.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [config.gameMode, config.opponentMode, config.playerColor, game.loadQuantumState, resumeAutosave, timer.restore])
 
   useEffect(() => {
@@ -245,6 +246,8 @@ export default function QuantumGameScreen({
     }, 200)
 
     return () => window.clearTimeout(timeoutId)
+    // Se guarda cuando cambia el tablero, no en cada render del objeto `game`.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     config.difficulty,
     config.gameMode,
@@ -342,11 +345,11 @@ export default function QuantumGameScreen({
   const topColor: PieceColor = game.boardFlipped ? config.playerColor : opponentColor
   const bottomColor: PieceColor = game.boardFlipped ? opponentColor : config.playerColor
 
-  const labelForColor = (c: PieceColor) => {
+  const labelForColor = useCallback((c: PieceColor) => {
     if (isOnline) return c === config.playerColor ? t.you : (language === 'es' ? 'Rival' : 'Opponent')
     if (isAIMode) return c === config.playerColor ? t.you : (language === 'es' ? 'IA cuántica' : 'Quantum AI')
     return getPlayerLabel(c, language)
-  }
+  }, [config.playerColor, isAIMode, isOnline, language, t.you])
 
   const classicHistory = useMemo(() => {
     return game.history.map((m) => ({
@@ -378,7 +381,7 @@ export default function QuantumGameScreen({
       limit: game.coherence[topColor].limit,
       label: language === 'es' ? 'Coherencia usada' : 'Coherence used',
     } : undefined,
-  }), [topColor, config, game, timer, language])
+  }), [topColor, config, game, timer, labelForColor, language])
 
   const bottomBar = useMemo(() => ({
     label: labelForColor(bottomColor),
@@ -396,7 +399,7 @@ export default function QuantumGameScreen({
       limit: game.coherence[bottomColor].limit,
       label: language === 'es' ? 'Coherencia usada' : 'Coherence used',
     } : undefined,
-  }), [bottomColor, config, game, timer, language])
+  }), [bottomColor, config, game, timer, labelForColor, language])
 
   const modeLabels: Record<QMoveMode, { icon: GameIconName; label: string; desc: string }> = {
     classical: { icon: 'classic', label: t.modeClassical, desc: t.modeClassicalDesc },

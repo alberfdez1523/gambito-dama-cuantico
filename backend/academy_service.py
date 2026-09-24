@@ -13,7 +13,6 @@ from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
 from typing import Any
 
-
 REVIEW_INTERVAL_DAYS = (1, 3, 7, 14, 30)
 ACTIVITY_KINDS = ("lesson", "guided", "puzzle", "exam")
 COURSE_MODULES = {

@@ -153,6 +153,8 @@ export function useChessGame(
     } catch {
       return new Set<string>()
     }
+    // `fen` invalida la caché: la partida vive en un ref mutable.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fen, selectedSquare])
 
   const classicalCastleOptions = useMemo(() => {
@@ -170,6 +172,8 @@ export function useChessGame(
     } catch {
       return []
     }
+    // `fen` invalida la caché: la partida vive en un ref mutable.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fen, isAIMode, config.playerColor])
 
   const history: MoveInfo[] = useMemo(() => {
@@ -185,6 +189,8 @@ export function useChessGame(
       flags: m.flags,
       description: describeMove(m, language),
     }))
+    // `fen` invalida la caché: la partida vive en un ref mutable.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fen, language])
 
   const captures: CapturedPieces = useMemo(() => {
@@ -377,21 +383,8 @@ export function useChessGame(
       cancelled = true
       clearTimeout(timer)
     }
-  }, [fen, isAIMode])
+  }, [fen, isAIMode, t.evalError])
 
-  // ─── Atajo de teclado (Ctrl+Z = deshacer) ───
-
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (e.ctrlKey && e.key === 'z') {
-        e.preventDefault()
-        undoMove()
-      }
-    }
-    window.addEventListener('keydown', handler)
-    return () => window.removeEventListener('keydown', handler)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
 
   // ─── Acciones del jugador ───
 
@@ -499,7 +492,7 @@ export function useChessGame(
     doMove(from, to)
   }, [config.playerColor, doMove, gameOverInfo, isAIMode, isOnline])
 
-  function undoMove() {
+  const undo = useCallback(() => {
     const game = gameRef.current
     if (isOnline || isThinkingRef.current || gameOverInfo) return
     const plies = isAIMode ? 2 : 1
@@ -508,9 +501,20 @@ export function useChessGame(
     setSelectedSquare(null)
     setLastMove(null)
     setFen(game.fen())
-  }
+  }, [gameOverInfo, isAIMode, isOnline])
 
-  const undo = useCallback(() => undoMove(), [gameOverInfo, isAIMode, isOnline])
+  // ─── Atajo de teclado (Ctrl+Z = deshacer) ───
+  // Depende de `undo` para no usar un estado de partida obsoleto (p. ej. tras terminar).
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.ctrlKey && e.key === 'z') {
+        e.preventDefault()
+        undo()
+      }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [undo])
 
   const flip = useCallback(() => {
     setBoardFlipped(prev => !prev)

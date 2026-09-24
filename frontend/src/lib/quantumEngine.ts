@@ -5,7 +5,7 @@
 
 import type {
   PieceColor, PieceType, QPiece, QBoardCell, QMoveRecord,
-  QMoveType, QEntanglement, QCastleEntData, QTunnelEntData,
+  QCastleEntData, QTunnelEntData,
   QState, QGameOver, QMeasurementEvent, QuantumAction, QuantumRng,
   ActionResult, GameResultCause,
 } from './types'
@@ -417,7 +417,7 @@ export class QuantumChessEngine {
     let moves: MoveTarget[]
     switch (piece.type) {
       case 'p': moves = this._pawnMoves(piece, fromSquare, board); break
-      case 'n': moves = this._jumpMoves(fromSquare, KNIGHT_OFFSETS, myColor, board, pieceId); break
+      case 'n': moves = this._jumpMoves(fromSquare, KNIGHT_OFFSETS, myColor, board); break
       case 'b': moves = this._sliderMoves(fromSquare, BISHOP_DIRS, myColor, board, pieceId); break
       case 'r': moves = this._sliderMoves(fromSquare, ROOK_DIRS, myColor, board, pieceId); break
       case 'q': moves = this._sliderMoves(fromSquare, QUEEN_DIRS, myColor, board, pieceId); break
@@ -647,7 +647,6 @@ export class QuantumChessEngine {
 
     if (enemies.length > 0) {
       const defender = enemies[0]
-      const defenderPiece = this.state.pieces[defender.pieceId]
       const defenderIsQuantum = defender.probability < 1
 
       if (attackerIsQuantum) {
@@ -1363,7 +1362,7 @@ export class QuantumChessEngine {
   }
 
   /** Movimientos de salto (caballo, rey) */
-  private _jumpMoves(from: string, offsets: Dir[], color: PieceColor, board: Record<string, QBoardCell[]>, myId: string): MoveTarget[] {
+  private _jumpMoves(from: string, offsets: Dir[], color: PieceColor, board: Record<string, QBoardCell[]>): MoveTarget[] {
     const [f, r] = sq2rc(from)
     const moves: MoveTarget[] = []
 
@@ -1383,7 +1382,7 @@ export class QuantumChessEngine {
 
   /** Movimientos del rey, incluyendo enroque clásico */
   private _kingMoves(piece: QPiece, from: string, board: Record<string, QBoardCell[]>): MoveTarget[] {
-    const moves = this._jumpMoves(from, KING_OFFSETS, piece.color, board, piece.id)
+    const moves = this._jumpMoves(from, KING_OFFSETS, piece.color, board)
     if (Object.keys(piece.positions).length !== 1 || piece.positions[from] !== 1) return moves
 
     const rank = piece.color === 'w' ? '1' : '8'

@@ -44,7 +44,7 @@ export default function OnlineLobby({
   const t = ui(language)
   const [view, setView] = useState<LobbyView>(initialJoinCode ? 'join' : 'menu')
   const [gameMode, setGameMode] = useState<GameMode>(initialGameMode)
-  const [color, setColor] = useState<PlayerColorChoice>(initialColor)
+  const [color] = useState<PlayerColorChoice>(initialColor)
   const [joinCode, setJoinCode] = useState(initialJoinCode ?? '')
   const [room, setRoom] = useState<OnlineRoomRow | null>(null)
   const [userId, setUserId] = useState<string | null>(null)

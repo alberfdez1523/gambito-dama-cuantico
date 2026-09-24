@@ -7,13 +7,13 @@ each other while also putting a hard ceiling on CPU and process usage.
 
 from __future__ import annotations
 
+import contextlib
 import queue
 import threading
 from collections.abc import Callable
 from typing import TypeVar
 
 import chess.engine
-
 
 ResultT = TypeVar("ResultT")
 
@@ -113,9 +113,8 @@ class StockfishPool:
             except queue.Empty:
                 break
         for engine in self._engines:
-            try:
+            # Apagado de mejor esfuerzo: un motor ya caído no debe impedir cerrar el resto.
+            with contextlib.suppress(Exception):
                 engine.quit()
-            except Exception:
-                pass
         self._engines.clear()
 
