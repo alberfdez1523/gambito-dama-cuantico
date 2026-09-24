@@ -9,7 +9,7 @@ import {
   type GameAutosaveSummary,
 } from '../lib/gameAutosave'
 import { loadGameSetup, saveGameSetup } from '../lib/gameSetup'
-import { getDifficultyLabel } from '../lib/i18n'
+import { getDifficultyLabel, ui } from '../lib/i18n'
 import type {
   Difficulty,
   CoherenceLimit,
@@ -337,7 +337,7 @@ export default function StartMenu({
               )}
             </div>
 
-            <nav className="grid gap-px border border-line bg-line sm:grid-cols-2" aria-label={language === 'es' ? 'Centro de juego' : 'Game hub'}>
+            <nav className="grid gap-px border border-line bg-line sm:grid-cols-2" aria-label={ui(language).gameHub}>
               <HubAction
                 icon="atom"
                 title={copy.quantum}

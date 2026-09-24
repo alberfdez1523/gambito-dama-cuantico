@@ -75,7 +75,7 @@ export default function Board({
     if (piece) {
       parts.push(`${getColorName(piece.color, language)} ${getPieceName(piece.type, language)}`)
     } else {
-      parts.push(language === 'es' ? 'vacía' : 'empty')
+      parts.push(ui(language).empty)
     }
     if (square === selectedSquare) parts.push(t.selected)
     if (legalSquares.has(square)) parts.push(t.legalMove)

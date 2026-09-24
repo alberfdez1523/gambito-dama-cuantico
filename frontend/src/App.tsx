@@ -200,7 +200,7 @@ export default function App() {
 
   useEffect(() => {
     const modeLabel = gameConfig?.gameMode === 'quantum'
-      ? language === 'es' ? ' | Modo Cuántico' : ' | Quantum Mode'
+      ? ui(language).quantumMode
       : ''
     document.title = `Gambito de Dama Cuántico${modeLabel}`
   }, [gameConfig, language])
@@ -367,7 +367,7 @@ export default function App() {
             <Suspense
               fallback={
                 <ScreenLoadingFallback
-                  label={language === 'es' ? 'Abriendo sala...' : 'Opening room...'}
+                  label={ui(language).openingRoom}
                 />
               }
             >
@@ -400,7 +400,7 @@ export default function App() {
           </div>
         ) : screen === 'academy' ? (
           <div key="academy" className="screen-enter">
-            <Suspense fallback={<ScreenLoadingFallback label={language === 'es' ? 'Abriendo la Academia...' : 'Opening Academy...'} />}>
+            <Suspense fallback={<ScreenLoadingFallback label={ui(language).openingAcademy} />}>
               <AcademyScreen
                 language={language}
                 academy={academy}
@@ -420,7 +420,7 @@ export default function App() {
           </div>
         ) : screen === 'lesson' && activeLesson ? (
           <div key={`lesson-${activeLesson.id}`} className="screen-enter">
-            <Suspense fallback={<ScreenLoadingFallback label={language === 'es' ? 'Preparando actividad...' : 'Preparing activity...'} />}>
+            <Suspense fallback={<ScreenLoadingFallback label={ui(language).preparingActivity} />}>
               <LessonScreen
                 lesson={activeLesson}
                 language={language}
@@ -448,7 +448,7 @@ export default function App() {
           </div>
         ) : screen === 'profile' ? (
           <div key="profile" className="screen-enter">
-            <Suspense fallback={<ScreenLoadingFallback label={language === 'es' ? 'Cargando perfil...' : 'Loading profile...'} />}>
+            <Suspense fallback={<ScreenLoadingFallback label={ui(language).loadingProfile} />}>
               <ProfileScreen
                 language={language}
                 academy={academy}
@@ -462,7 +462,7 @@ export default function App() {
             <Suspense
               fallback={
                 <ScreenLoadingFallback
-                  label={language === 'es' ? 'Cargando partida...' : 'Loading game...'}
+                  label={ui(language).loadingGame}
                 />
               }
             >

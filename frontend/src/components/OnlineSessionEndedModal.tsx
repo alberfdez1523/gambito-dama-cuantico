@@ -57,7 +57,7 @@ export default function OnlineSessionEndedModal({
               className="inline-flex min-h-11 w-full items-center justify-center gap-2 border border-quantum bg-quantum/10 py-3 text-ui-sm font-semibold text-quantum"
             >
               <GameIcon name="retry" />
-              {language === 'es' ? 'Intentar reconectar' : 'Try reconnecting'}
+              {ui(language).tryReconnecting}
             </button>
             <button
               type="button"

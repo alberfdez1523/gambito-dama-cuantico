@@ -105,7 +105,7 @@ export default function QuantumBoard({
       const selected = (board[selectedPiece.square] ?? []).find((cell) => cell.pieceId === selectedPiece.id)
       const branchCount = Object.values(board).flat().filter((cell) => cell.pieceId === selectedPiece.id).length
       liveRef.current.textContent = selected
-        ? `${getColorName(selected.color, language)} ${getPieceName(selected.type, language)}, ${selectedPiece.square}, ${t.selected}, ${branchCount} ${language === 'es' ? 'ramas' : 'branches'}`
+        ? `${getColorName(selected.color, language)} ${getPieceName(selected.type, language)}, ${selectedPiece.square}, ${t.selected}, ${branchCount} ${ui(language).branches}`
         : `${selectedPiece.square}, ${t.selected}`
       return
     }
@@ -116,7 +116,7 @@ export default function QuantumBoard({
     const cells = board[square] || []
     const parts: string[] = [square]
     if (cells.length === 0) {
-      parts.push(language === 'es' ? 'vacía' : 'empty')
+      parts.push(ui(language).empty)
     } else {
       parts.push(
         cells
@@ -126,7 +126,7 @@ export default function QuantumBoard({
     }
     if (selectedPiece && cells.some((cell) => cell.pieceId === selectedPiece.id)) parts.push(t.selected)
     if (legalTargets.has(square)) parts.push(t.legalMove)
-    if (mergeTargets.has(square)) parts.push(language === 'es' ? 'fusión posible' : 'merge target')
+    if (mergeTargets.has(square)) parts.push(ui(language).mergeTarget)
     if (lastMove?.from === square) parts.push(t.lastMoveFrom)
     if (lastMove?.to === square) parts.push(t.lastMoveTo)
     if (square === checkSquare) parts.push(t.check)

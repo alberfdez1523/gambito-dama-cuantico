@@ -19,6 +19,7 @@ import type { Language } from '../../lib/types'
 import { FEATURES } from '../../lib/featureFlags'
 import GameIcon from '../GameIcon'
 import QuantumLogo from '../QuantumLogo'
+import { ui } from '../../lib/i18n'
 
 interface AcademyScreenProps {
   language: Language
@@ -121,7 +122,7 @@ export default function AcademyScreen({
           </div>
         </section>
 
-        <section className="mt-8" aria-label={language === 'es' ? 'Selector de ruta' : 'Route selector'}>
+        <section className="mt-8" aria-label={ui(language).routeSelector}>
           <div className="grid max-w-xl grid-cols-2 border border-line bg-line" role="radiogroup">
             {(['classic', 'quantum'] as CourseId[]).map((candidate) => (
               <button

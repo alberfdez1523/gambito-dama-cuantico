@@ -346,8 +346,8 @@ export default function QuantumGameScreen({
   const bottomColor: PieceColor = game.boardFlipped ? opponentColor : config.playerColor
 
   const labelForColor = useCallback((c: PieceColor) => {
-    if (isOnline) return c === config.playerColor ? t.you : (language === 'es' ? 'Rival' : 'Opponent')
-    if (isAIMode) return c === config.playerColor ? t.you : (language === 'es' ? 'IA cuántica' : 'Quantum AI')
+    if (isOnline) return c === config.playerColor ? t.you : (ui(language).opponent)
+    if (isAIMode) return c === config.playerColor ? t.you : (ui(language).quantumAi)
     return getPlayerLabel(c, language)
   }, [config.playerColor, isAIMode, isOnline, language, t.you])
 
@@ -370,7 +370,7 @@ export default function QuantumGameScreen({
     elo: '',
     color: topColor,
     isActive: game.turn === topColor && !game.gameOver,
-    turnLabel: game.turn === topColor && !game.gameOver ? (language === 'es' ? 'Mueve' : 'To move') : undefined,
+    turnLabel: game.turn === topColor && !game.gameOver ? (ui(language).toMove) : undefined,
     accent: 'quantum' as const,
     captures: [] as PieceType[],
     materialDiff: 0,
@@ -379,7 +379,7 @@ export default function QuantumGameScreen({
     coherence: game.coherence ? {
       used: game.coherence[topColor].used,
       limit: game.coherence[topColor].limit,
-      label: language === 'es' ? 'Coherencia usada' : 'Coherence used',
+      label: ui(language).coherenceUsed,
     } : undefined,
   }), [topColor, config, game, timer, labelForColor, language])
 
@@ -388,7 +388,7 @@ export default function QuantumGameScreen({
     elo: '',
     color: bottomColor,
     isActive: game.turn === bottomColor && !game.gameOver,
-    turnLabel: game.turn === bottomColor && !game.gameOver ? (language === 'es' ? 'Mueve' : 'To move') : undefined,
+    turnLabel: game.turn === bottomColor && !game.gameOver ? (ui(language).toMove) : undefined,
     accent: 'quantum' as const,
     captures: [] as PieceType[],
     materialDiff: 0,
@@ -397,7 +397,7 @@ export default function QuantumGameScreen({
     coherence: game.coherence ? {
       used: game.coherence[bottomColor].used,
       limit: game.coherence[bottomColor].limit,
-      label: language === 'es' ? 'Coherencia usada' : 'Coherence used',
+      label: ui(language).coherenceUsed,
     } : undefined,
   }), [bottomColor, config, game, timer, labelForColor, language])
 
@@ -475,12 +475,8 @@ export default function QuantumGameScreen({
       tone: 'neutral',
       priority: 'high',
       message: isInitiator
-        ? language === 'es'
-          ? 'Medición en curso — gira la ruleta para revelar el movimiento.'
-          : 'Measurement in progress — spin the roulette to reveal the move.'
-        : language === 'es'
-          ? 'Medición en curso. Comparte la revelación con tu rival.'
-          : 'Measurement in progress. Share the reveal with your opponent.',
+        ? ui(language).measurementSpinHint
+        : ui(language).measurementShareHint,
     })
   }
   if (showReleasedBanner) {
@@ -496,11 +492,9 @@ export default function QuantumGameScreen({
       id: 'quantum-ai-fallback',
       tone: 'warning',
       priority: 'normal',
-      message: language === 'es'
-        ? 'La IA cuántica no pudo completar la jugada.'
-        : 'Quantum AI could not complete its move.',
+      message: ui(language).quantumAiMoveFailed,
       action: {
-        label: language === 'es' ? 'Reintentar' : 'Retry',
+        label: ui(language).engineErrorRetry,
         onSelect: game.retryAIMove,
       },
     })
@@ -512,12 +506,10 @@ export default function QuantumGameScreen({
       priority: 'high',
       message:
         onlineSync.syncError === 'CONFLICT' || onlineSync.syncError === 'OUT_OF_SYNC'
-          ? language === 'es'
-            ? 'Estado cuántico resincronizado con el servidor.'
-            : 'Quantum state resynced with the server.'
-          : `${language === 'es' ? 'Error de sincronización: ' : 'Sync error: '}${onlineSync.syncError}`,
+          ? ui(language).quantumStateResynced
+          : `${ui(language).syncError}${onlineSync.syncError}`,
       action: {
-        label: language === 'es' ? 'Reconectar' : 'Reconnect',
+        label: ui(language).reconnect,
         onSelect: () => void onlineSync.retryConnection(),
       },
     })
@@ -538,7 +530,7 @@ export default function QuantumGameScreen({
             ? `${config.rulesetId === 'quantum-coherence' ? 'Coherencia limitada' : 'Cuántico'} vs IA · ${config.difficulty}`
             : `${config.rulesetId === 'quantum-coherence' ? 'Limited coherence' : 'Quantum'} vs AI · ${config.difficulty}`)
         : config.rulesetId === 'quantum-coherence'
-          ? (language === 'es' ? 'Coherencia limitada' : 'Limited coherence')
+          ? (ui(language).limitedCoherence)
           : t.quantumBadge,
     roomCode: isOnline ? config.online?.code : undefined,
     connection: isOnline ? { label: onlineStatusText, tone: connectionTone } : undefined,
@@ -558,12 +550,12 @@ export default function QuantumGameScreen({
     labels: {
       settings: t.settings,
       menu: t.menu,
-      openInspector: language === 'es' ? 'Abrir inspector cuántico' : 'Open quantum inspector',
-      inspectorTitle: language === 'es' ? 'Inspector cuántico' : 'Quantum inspector',
+      openInspector: ui(language).openQuantumInspector,
+      inspectorTitle: ui(language).quantumInspector,
       tabs: {
-        game: language === 'es' ? 'Partida' : 'Game',
-        history: language === 'es' ? 'Historial' : 'History',
-        analysis: language === 'es' ? 'Análisis' : 'Analysis',
+        game: ui(language).game,
+        history: ui(language).history,
+        analysis: ui(language).analysis,
       },
     },
   }
@@ -619,7 +611,7 @@ export default function QuantumGameScreen({
             <section className="border border-cyan-400/25 bg-cyan-500/[0.06] p-3.5">
               <div className="flex items-center justify-between gap-3">
                 <p className="text-ui-xs font-semibold text-cyan-300">
-                  {language === 'es' ? 'Coherencia limitada' : 'Limited coherence'}
+                  {ui(language).limitedCoherence}
                 </p>
                 <span className="font-mono text-ui-xs text-cyan-300">
                   {game.coherence[game.turn].used}/{game.coherence[game.turn].limit}
@@ -634,9 +626,7 @@ export default function QuantumGameScreen({
                 ))}
               </div>
               <p className="mt-3 text-[0.68rem] leading-5 text-neutral-500">
-                {language === 'es'
-                  ? 'Cada rama adicional y túnel activo ocupa una unidad. Fusionar o colapsar la libera.'
-                  : 'Each extra branch and active tunnel uses one unit. Merging or collapsing releases it.'}
+                {ui(language).coherenceCostHint}
               </p>
             </section>
           )}
@@ -651,11 +641,11 @@ export default function QuantumGameScreen({
           {selectedRailPiece ? (
             <section className="border-t border-surface-4 pt-4">
               <p className="text-ui-xs font-semibold text-neutral-400">
-                {language === 'es' ? 'Selección' : 'Selection'}
+                {ui(language).selection}
               </p>
               <p className="mt-2 text-ui-sm font-medium text-ink">
                 {game.selectedPiece?.square} · {Object.keys(selectedRailPiece.positions).length}{' '}
-                {language === 'es' ? 'rama(s)' : 'branch(es)'}
+                {ui(language).branchesPlural}
               </p>
               <p className="mt-1 font-mono text-ui-xs text-neutral-600">
                 {Object.keys(selectedRailPiece.positions).join(' / ')}
@@ -663,9 +653,7 @@ export default function QuantumGameScreen({
             </section>
           ) : (
             <p className="border-t border-surface-4 pt-4 text-ui-xs leading-relaxed text-neutral-600">
-              {language === 'es'
-                ? 'Selecciona una pieza para inspeccionar todas sus ramas.'
-                : 'Select a piece to inspect all of its branches.'}
+              {ui(language).selectPieceToInspect}
             </p>
           )}
         </div>
@@ -760,9 +748,7 @@ export default function QuantumGameScreen({
               variant="quantum-heuristic"
             />
             <p className="text-ui-xs leading-relaxed text-neutral-600">
-              {language === 'es'
-                ? 'Balance material esperado, ponderado por la probabilidad de cada rama. No es una probabilidad de victoria.'
-                : 'Expected material balance weighted by each branch probability. It is not a win probability.'}
+              {ui(language).expectedMaterialHint}
             </p>
           </div>
         ),

@@ -51,7 +51,7 @@ export default function GameMobileStatsSheet({
           >
             <div className="flex shrink-0 items-center justify-between border-b border-surface-4 px-4 py-3">
               <h2 id={titleId} className="text-ui-sm font-semibold text-white">
-                {title ?? (language === 'es' ? 'Inspector de partida' : 'Game inspector')}
+                {title ?? (ui(language).gameInspector)}
               </h2>
               <button
                 type="button"

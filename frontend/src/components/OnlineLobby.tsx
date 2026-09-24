@@ -198,7 +198,7 @@ export default function OnlineLobby({
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
     } catch {
-      setError(language === 'es' ? 'No se pudo copiar la invitación.' : 'The invitation could not be copied.')
+      setError(ui(language).inviteCopyFailed)
     }
   }
 
@@ -212,7 +212,7 @@ export default function OnlineLobby({
     try {
       await navigator.share({
         title: 'Gambito de Dama Cuántico',
-        text: language === 'es' ? `Únete a mi sala ${room.code}` : `Join my room ${room.code}`,
+        text: ui(language).joinMyRoom(room.code),
         url,
       })
     } catch {
@@ -308,14 +308,14 @@ export default function OnlineLobby({
               </div>
             </fieldset>
 
-            <aside className="rounded-xl bg-surface-1 p-5" aria-label={language === 'es' ? 'Resumen de sala' : 'Room summary'}>
-              <h2 className="text-ui-base font-semibold text-white">{language === 'es' ? 'Resumen' : 'Summary'}</h2>
+            <aside className="rounded-xl bg-surface-1 p-5" aria-label={ui(language).roomSummary}>
+              <h2 className="text-ui-base font-semibold text-white">{ui(language).summary}</h2>
               <dl className="mt-5 space-y-4 text-ui-sm">
                 <div className="flex justify-between gap-4"><dt className="text-neutral-500">{t.gameMode}</dt><dd className={gameMode === 'quantum' ? 'text-quantum' : 'text-accent'}>{gameMode === 'quantum' ? t.modeQuantum : t.modeClassical}</dd></div>
-                <div className="flex justify-between gap-4"><dt className="text-neutral-500">{language === 'es' ? 'Reloj' : 'Clock'}</dt><dd className="text-neutral-300">{useTimer ? `${timerMinutes} min` : language === 'es' ? 'Sin reloj' : 'No clock'}</dd></div>
-                <div className="flex justify-between gap-4"><dt className="text-neutral-500">{language === 'es' ? 'Color' : 'Color'}</dt><dd className="text-neutral-300">{color === 'random' ? (language === 'es' ? 'Aleatorio' : 'Random') : color === 'w' ? (language === 'es' ? 'Blancas' : 'White') : (language === 'es' ? 'Negras' : 'Black')}</dd></div>
+                <div className="flex justify-between gap-4"><dt className="text-neutral-500">{ui(language).clock}</dt><dd className="text-neutral-300">{useTimer ? `${timerMinutes} min` : ui(language).noClock}</dd></div>
+                <div className="flex justify-between gap-4"><dt className="text-neutral-500">{ui(language).color}</dt><dd className="text-neutral-300">{color === 'random' ? (ui(language).random) : color === 'w' ? (ui(language).white) : (ui(language).black)}</dd></div>
               </dl>
-              <p className="mt-6 text-ui-xs leading-relaxed text-neutral-500">{language === 'es' ? 'El multijugador permanece en beta casual mientras se completa la validación autoritativa del servidor.' : 'Multiplayer remains in casual beta while server-authoritative validation is completed.'}</p>
+              <p className="mt-6 text-ui-xs leading-relaxed text-neutral-500">{ui(language).multiplayerBetaNotice}</p>
             </aside>
           </div>
         )}
@@ -389,7 +389,7 @@ export default function OnlineLobby({
                 className="inline-flex min-h-11 items-center justify-center gap-2 rounded border border-surface-4 py-3 text-ui-sm text-neutral-300"
               >
                 <GameIcon name="share" />
-                {language === 'es' ? 'Compartir invitación' : 'Share invitation'}
+                {ui(language).shareInvitation}
               </button>
               {userId &&
                 room.white_player_id === userId &&
@@ -420,10 +420,10 @@ export default function OnlineLobby({
             </div>
             </div>
             <aside className="rounded-xl bg-surface-2 p-5 text-left">
-              <h2 className="text-ui-base font-semibold text-white">{language === 'es' ? 'Jugadores' : 'Players'}</h2>
+              <h2 className="text-ui-base font-semibold text-white">{ui(language).players}</h2>
               <div className="mt-4 space-y-3">
-                <LobbySeat label={room.white_player_id ? (room.white_player_id === userId ? (language === 'es' ? 'Tú' : 'You') : (language === 'es' ? 'Invitado' : 'Guest')) : (language === 'es' ? 'Esperando' : 'Waiting')} color="w" connected={!!room.white_player_id} language={language} />
-                <LobbySeat label={room.black_player_id ? (room.black_player_id === userId ? (language === 'es' ? 'Tú' : 'You') : (language === 'es' ? 'Invitado' : 'Guest')) : (language === 'es' ? 'Esperando' : 'Waiting')} color="b" connected={!!room.black_player_id} language={language} />
+                <LobbySeat label={room.white_player_id ? (room.white_player_id === userId ? (ui(language).you) : (ui(language).guest)) : (ui(language).waiting)} color="w" connected={!!room.white_player_id} language={language} />
+                <LobbySeat label={room.black_player_id ? (room.black_player_id === userId ? (ui(language).you) : (ui(language).guest)) : (ui(language).waiting)} color="b" connected={!!room.black_player_id} language={language} />
               </div>
             </aside>
           </div>
@@ -451,9 +451,9 @@ function LobbySeat({
       </span>
       <div className="min-w-0 flex-1">
         <p className="truncate text-ui-sm font-semibold text-neutral-300">{label}</p>
-        <p className="text-ui-xs text-neutral-500">{color === 'w' ? (language === 'es' ? 'Blancas' : 'White') : (language === 'es' ? 'Negras' : 'Black')}</p>
+        <p className="text-ui-xs text-neutral-500">{color === 'w' ? (ui(language).white) : (ui(language).black)}</p>
       </div>
-      <span className={`h-2 w-2 rounded-full ${connected ? 'bg-emerald-400' : 'bg-surface-4'}`} aria-label={connected ? (language === 'es' ? 'Conectado' : 'Connected') : (language === 'es' ? 'Desconectado' : 'Disconnected')} />
+      <span className={`h-2 w-2 rounded-full ${connected ? 'bg-emerald-400' : 'bg-surface-4'}`} aria-label={connected ? (ui(language).connected) : (ui(language).disconnected)} />
     </div>
   )
 }

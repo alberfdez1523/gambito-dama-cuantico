@@ -38,8 +38,8 @@ function evalToChances(ev: number | null | undefined): Chances {
 function describeMove(m: {
   piece: string; to: string; flags: string; captured?: string; promotion?: string
 }, language: Language): string {
-  if (m.flags.includes('k')) return language === 'es' ? 'Enroque corto' : 'Kingside castling'
-  if (m.flags.includes('q')) return language === 'es' ? 'Enroque largo' : 'Queenside castling'
+  if (m.flags.includes('k')) return ui(language).kingsideCastling
+  if (m.flags.includes('q')) return ui(language).queensideCastling
   if (m.promotion) {
     return language === 'es'
       ? `Promoción a ${getPieceName(m.promotion as PieceType, language)}`
@@ -73,18 +73,18 @@ function detectGameEnd(
     const loserTurn = game.turn()
     if (!isAIMode) {
       return loserTurn === 'w'
-        ? { title: language === 'es' ? 'Jaque mate' : 'Checkmate', message: language === 'es' ? 'Ganan negras' : 'Black wins', result: 'lose' }
-        : { title: language === 'es' ? 'Jaque mate' : 'Checkmate', message: language === 'es' ? 'Ganan blancas' : 'White wins', result: 'win' }
+        ? { title: ui(language).checkmate, message: ui(language).blackWins, result: 'lose' }
+        : { title: ui(language).checkmate, message: ui(language).whiteWins, result: 'win' }
     }
     return loserTurn === playerColor
-      ? { title: language === 'es' ? 'Derrota' : 'Defeat', message: language === 'es' ? 'La IA te ha dado jaque mate' : 'The AI checkmated you', result: 'lose' }
-      : { title: language === 'es' ? '¡Victoria!' : 'Victory!', message: language === 'es' ? 'Has ganado por jaque mate' : 'You won by checkmate', result: 'win' }
+      ? { title: ui(language).defeat, message: ui(language).aiCheckmatedYou, result: 'lose' }
+      : { title: ui(language).victory, message: ui(language).youWonByCheckmate, result: 'win' }
   }
-  if (game.isStalemate()) return { title: language === 'es' ? 'Tablas' : 'Draw', message: language === 'es' ? 'Rey ahogado' : 'Stalemate', result: 'draw' }
-  if (game.isThreefoldRepetition()) return { title: language === 'es' ? 'Tablas' : 'Draw', message: language === 'es' ? 'Triple repetición' : 'Threefold repetition', result: 'draw' }
-  if (game.isInsufficientMaterial()) return { title: language === 'es' ? 'Tablas' : 'Draw', message: language === 'es' ? 'Material insuficiente' : 'Insufficient material', result: 'draw' }
-  if (game.isDraw()) return { title: language === 'es' ? 'Tablas' : 'Draw', message: language === 'es' ? 'Empate técnico' : 'Draw', result: 'draw' }
-  return { title: language === 'es' ? 'Fin' : 'Game Over', message: language === 'es' ? 'Partida terminada' : 'Game finished', result: 'draw' }
+  if (game.isStalemate()) return { title: ui(language).draw, message: ui(language).stalemate, result: 'draw' }
+  if (game.isThreefoldRepetition()) return { title: ui(language).draw, message: ui(language).threefoldRepetition, result: 'draw' }
+  if (game.isInsufficientMaterial()) return { title: ui(language).draw, message: ui(language).insufficientMaterial, result: 'draw' }
+  if (game.isDraw()) return { title: ui(language).draw, message: ui(language).technicalDraw, result: 'draw' }
+  return { title: ui(language).gameOver, message: ui(language).gameFinished, result: 'draw' }
 }
 
 // ─── Sonidos ───
@@ -524,8 +524,8 @@ export function useChessGame(
     if (gameOverInfo) return
     sounds.playGameEnd()
     setGameOverInfo({
-      title: language === 'es' ? 'Rendición' : 'Resignation',
-      message: language === 'es' ? 'Has abandonado la partida' : 'You resigned the game',
+      title: ui(language).resignation,
+      message: ui(language).youResignedTheGame,
       result: 'lose',
     })
   }, [gameOverInfo, sounds, language])
@@ -537,11 +537,11 @@ export function useChessGame(
       setGameOverInfo(
         isAIMode
           ? color === config.playerColor
-            ? { title: language === 'es' ? '¡Tiempo agotado!' : 'Time Out!', message: language === 'es' ? 'Se te acabó el tiempo' : 'You ran out of time', result: 'lose' }
-            : { title: language === 'es' ? '¡Victoria!' : 'Victory!', message: language === 'es' ? 'La IA se quedó sin tiempo' : 'The AI ran out of time', result: 'win' }
+            ? { title: ui(language).timeOutExclaimed, message: ui(language).youRanOutOfTime, result: 'lose' }
+            : { title: ui(language).victory, message: ui(language).aiRanOutOfTime, result: 'win' }
           : color === 'w'
-            ? { title: language === 'es' ? 'Tiempo agotado' : 'Time Out', message: language === 'es' ? 'Ganan negras por tiempo' : 'Black wins on time', result: 'lose' }
-            : { title: language === 'es' ? 'Tiempo agotado' : 'Time Out', message: language === 'es' ? 'Ganan blancas por tiempo' : 'White wins on time', result: 'win' }
+            ? { title: ui(language).timeOut, message: ui(language).blackWinsOnTime, result: 'lose' }
+            : { title: ui(language).timeOut, message: ui(language).whiteWinsOnTime, result: 'win' }
       )
     },
     [gameOverInfo, config.playerColor, sounds, isAIMode, language]
