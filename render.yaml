@@ -30,6 +30,12 @@ services:
         value: "2"
       - key: STOCKFISH_QUEUE_TIMEOUT
         value: "3"
+      # Render termina TLS en su proxy: confiar en X-Forwarded-For para que el
+      # limitador de peticiones vea la IP real del cliente.
+      - key: FORWARDED_ALLOW_IPS
+        value: "*"
+      - key: RATE_LIMIT_ENGINE_PER_MINUTE
+        value: "60"
       # Gates de seguridad: activar solo tras las pruebas descritas en
       # IMPLEMENTATION_STATUS.md.
       - key: FEATURE_AUTHORITATIVE_QUANTUM

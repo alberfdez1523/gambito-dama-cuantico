@@ -28,3 +28,6 @@ engine/stockfish.exe
 Thumbs.db
 *.swp
 *.swo
+
+# Artefactos de compilación de TypeScript
+*.tsbuildinfo
