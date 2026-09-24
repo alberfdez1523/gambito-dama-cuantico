@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { AnimatePresence, motion } from 'framer-motion'
+import { AnimatePresence, m } from 'framer-motion'
 import MiniBoard from './MiniBoard'
 import { makeGrid, placeMiniSquare } from './miniBoardUtils'
 import { useMiniSqPx } from './useMiniSqPx'
@@ -454,7 +454,7 @@ export default function QuantumTutorial({ es }: QuantumTutorialProps) {
 
         <article className="overflow-hidden rounded-lg border border-indigo-500/20 bg-indigo-500/5">
           <AnimatePresence mode="wait">
-            <motion.div
+            <m.div
               key={current.id}
               className="grid gap-6 p-5 lg:grid-cols-[minmax(0,1fr)_auto] lg:p-6"
               initial={{ opacity: 0, y: 8 }}
@@ -509,7 +509,7 @@ export default function QuantumTutorial({ es }: QuantumTutorialProps) {
                   )}
                 </fieldset>
               </div>
-            </motion.div>
+            </m.div>
           </AnimatePresence>
 
           <div className="flex items-center justify-between border-t border-indigo-500/15 px-5 py-4 lg:px-6">

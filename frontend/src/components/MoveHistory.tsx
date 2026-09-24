@@ -1,5 +1,5 @@
 import { useRef, useEffect, useState } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { m, AnimatePresence } from 'framer-motion'
 import { pieceGlyph } from '../lib/constants'
 import { translateMoveDescription, ui } from '../lib/i18n'
 import type { Language, MoveInfo, PieceType } from '../lib/types'
@@ -86,7 +86,7 @@ export default function MoveHistory({
             const isLast = i === history.length - 1
 
             return (
-              <motion.div
+              <m.div
                 key={i}
                 data-testid="move-history-item"
                 initial={{ opacity: 0, x: -8 }}
@@ -113,7 +113,7 @@ export default function MoveHistory({
                   {translateMoveDescription(move.description, language)}
                 </span>
                 <span className="shrink-0 font-mono text-ui-xs text-neutral-600">{move.san}</span>
-              </motion.div>
+              </m.div>
             )
           })}
         </AnimatePresence>

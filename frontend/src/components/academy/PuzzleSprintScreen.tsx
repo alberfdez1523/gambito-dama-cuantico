@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { motion } from 'framer-motion'
+import { m } from 'framer-motion'
 import type { AcademyProgressController } from '../../hooks/useAcademyProgress'
 import { ACADEMY_LESSONS } from '../../lib/academyContent'
 import { sprintCopy } from '../../lib/academyCopy'
@@ -116,7 +116,7 @@ export default function PuzzleSprintScreen({
         <p className="mt-3 text-center text-xs text-ink-muted">{copy.privateAttempt}</p>
 
         {!finished ? (
-          <motion.section
+          <m.section
             key={`${run}-${questionIndex}`}
             initial={{ opacity: 0, x: 12 }}
             animate={{ opacity: 1, x: 0 }}
@@ -147,9 +147,9 @@ export default function PuzzleSprintScreen({
                 </button>
               ))}
             </div>
-          </motion.section>
+          </m.section>
         ) : (
-          <motion.section initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="mx-auto mt-10 max-w-2xl border border-line bg-surface-1 p-7 text-center sm:p-10">
+          <m.section initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="mx-auto mt-10 max-w-2xl border border-line bg-surface-1 p-7 text-center sm:p-10">
             <span className="mx-auto grid h-14 w-14 place-items-center border border-accent/50 text-accent">
               <GameIcon name="check" className="h-7 w-7" />
             </span>
@@ -164,7 +164,7 @@ export default function PuzzleSprintScreen({
               <button type="button" onClick={restart} className="min-h-12 bg-accent px-5 text-sm font-semibold text-surface-0 hover:bg-accent-hover">{copy.again}</button>
               <button type="button" onClick={onBack} className="min-h-12 border border-line px-5 text-sm font-semibold text-ink hover:border-ink">{copy.map}</button>
             </div>
-          </motion.section>
+          </m.section>
         )}
       </div>
     </main>

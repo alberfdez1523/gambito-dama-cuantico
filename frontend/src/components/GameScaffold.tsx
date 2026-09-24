@@ -5,7 +5,7 @@ import {
   type CSSProperties,
   type ReactNode,
 } from 'react'
-import { motion, useReducedMotion } from 'framer-motion'
+import { m, useReducedMotion } from 'framer-motion'
 import type {
   GameChromeModel,
   GameNotice,
@@ -313,7 +313,7 @@ export default function GameScaffold({
         }`}
       >
         {contextRail ? (
-          <motion.aside
+          <m.aside
             className="hidden min-h-0 overflow-y-auto border-r border-surface-4 pr-4 lg:block"
             aria-label={isQuantum ? 'Quantum controls' : 'Game controls'}
             initial={reduceMotion ? false : { opacity: 0, x: -12 }}
@@ -321,7 +321,7 @@ export default function GameScaffold({
             transition={reduceMotion ? { duration: 0 } : { duration: 0.2 }}
           >
             {contextRail}
-          </motion.aside>
+          </m.aside>
         ) : null}
 
         <main
@@ -334,14 +334,14 @@ export default function GameScaffold({
               <PlayerBar {...model.players.top} accent={accent} />
             </div>
 
-            <motion.div
+            <m.div
               className="shrink-0"
               initial={reduceMotion ? false : { opacity: 0, scale: 0.985 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={reduceMotion ? { duration: 0 } : { duration: 0.2 }}
             >
               {board}
-            </motion.div>
+            </m.div>
 
             <div className="shrink-0" data-game-board-chrome>
               <PlayerBar {...model.players.bottom} accent={accent} />
@@ -370,7 +370,7 @@ export default function GameScaffold({
           </div>
         </main>
 
-        <motion.aside
+        <m.aside
           className="hidden min-h-0 flex-col overflow-hidden border-l border-surface-4 bg-surface-1/45 lg:flex"
           aria-label={model.labels.inspectorTitle}
           initial={reduceMotion ? false : { opacity: 0, x: 12 }}
@@ -384,7 +384,7 @@ export default function GameScaffold({
             labels={model.labels.tabs}
             slots={inspector}
           />
-        </motion.aside>
+        </m.aside>
       </div>
 
       <GameMobileStatsSheet

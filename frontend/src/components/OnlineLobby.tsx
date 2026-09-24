@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { motion } from 'framer-motion'
+import { m } from 'framer-motion'
 import type { GameConfig, GameMode, Language, OnlineMeta, PieceColor, PlayerColorChoice } from '../lib/types'
 import {
   createOnlineRoom,
@@ -226,7 +226,7 @@ export default function OnlineLobby({
 
   if (!supabaseReady) {
     return (
-      <motion.div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-surface-0 px-6 text-center">
+      <m.div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-surface-0 px-6 text-center">
         <p className="text-ui-lg text-white">{t.onlineNotConfigured}</p>
         <p className="max-w-md text-ui-sm text-neutral-500">{t.onlineNotConfiguredHint}</p>
         <button
@@ -236,12 +236,12 @@ export default function OnlineLobby({
         >
           {t.menu}
         </button>
-      </motion.div>
+      </m.div>
     )
   }
 
   return (
-    <motion.div className="min-h-screen bg-surface-0 px-4 py-6 sm:py-10">
+    <m.div className="min-h-screen bg-surface-0 px-4 py-6 sm:py-10">
       <div className="mx-auto max-w-4xl">
         <button
           type="button"
@@ -252,9 +252,9 @@ export default function OnlineLobby({
           {t.menu}
         </button>
 
-        <motion.div className="flex flex-wrap items-center gap-2">
+        <m.div className="flex flex-wrap items-center gap-2">
           <h1 className="font-serif text-4xl text-ink">{t.onlineTitle}</h1>
-        </motion.div>
+        </m.div>
         <p className="mt-2 text-ui-sm text-neutral-500">{t.onlineSubtitle}</p>
 
         {error && (
@@ -269,7 +269,7 @@ export default function OnlineLobby({
               <legend className="mb-3 block text-ui-sm font-semibold text-neutral-300">
                 {t.gameMode}
               </legend>
-              <motion.div role="radiogroup" className="mb-5 flex rounded-lg bg-surface-2 p-1">
+              <m.div role="radiogroup" className="mb-5 flex rounded-lg bg-surface-2 p-1">
               {(['classic', 'quantum'] as GameMode[]).map((m) => (
                 <button
                   key={m}
@@ -288,7 +288,7 @@ export default function OnlineLobby({
                   {m === 'classic' ? t.modeClassical : t.modeQuantum}
                 </button>
               ))}
-              </motion.div>
+              </m.div>
 
               <div className="space-y-3">
                 <button
@@ -429,7 +429,7 @@ export default function OnlineLobby({
           </div>
         )}
       </div>
-    </motion.div>
+    </m.div>
   )
 }
 

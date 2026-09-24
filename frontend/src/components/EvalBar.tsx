@@ -1,4 +1,4 @@
-import { motion, useReducedMotion } from 'framer-motion'
+import { m, useReducedMotion } from 'framer-motion'
 import type { Chances, Language, PieceColor } from '../lib/types'
 import { ui } from '../lib/i18n'
 
@@ -36,19 +36,19 @@ export default function EvalBar({
       </div>
 
       <div className="flex h-1 w-full overflow-hidden bg-surface-3">
-        <motion.div
+        <m.div
           className="bg-white"
           initial={{ width: '33%' }}
           animate={{ width: `${chances.white}%` }}
           transition={reduceMotion ? { duration: 0 } : { duration: 0.5, ease: 'easeOut' }}
         />
-        <motion.div
+        <m.div
           className="bg-neutral-500"
           initial={{ width: '34%' }}
           animate={{ width: `${chances.draw}%` }}
           transition={reduceMotion ? { duration: 0 } : { duration: 0.5, ease: 'easeOut' }}
         />
-        <motion.div
+        <m.div
           className="bg-neutral-800"
           initial={{ width: '33%' }}
           animate={{ width: `${chances.black}%` }}

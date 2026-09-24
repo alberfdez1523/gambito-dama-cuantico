@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { motion, useReducedMotion } from 'framer-motion'
+import { m, useReducedMotion } from 'framer-motion'
 import type { AcademyProgressController } from '../../hooks/useAcademyProgress'
 import {
   ACADEMY_LESSON_BY_ID,
@@ -154,7 +154,7 @@ export default function AcademyScreen({
               </span>
             </div>
             <div className="mt-5 h-1.5 overflow-hidden bg-surface-3" aria-hidden="true">
-              <motion.div
+              <m.div
                 className={course === 'quantum' ? 'h-full bg-quantum' : 'h-full bg-accent'}
                 initial={reduceMotion ? false : { width: 0 }}
                 animate={{ width: `${completion}%` }}
@@ -295,7 +295,7 @@ export default function AcademyScreen({
               const mastery = progress.mastery[module.skillId]
               const completed = moduleLessons.filter((lesson) => progress.completedLessonIds.includes(lesson.id)).length
               return (
-                <motion.article
+                <m.article
                   key={module.id}
                   data-testid="academy-module"
                   initial={reduceMotion ? false : { opacity: 0, y: 10 }}
@@ -339,7 +339,7 @@ export default function AcademyScreen({
                       />
                     ))}
                   </div>
-                </motion.article>
+                </m.article>
               )
             })}
           </div>

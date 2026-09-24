@@ -1,4 +1,4 @@
-import { AnimatePresence, motion } from 'framer-motion'
+import { AnimatePresence, m } from 'framer-motion'
 import { useReducedMotion } from 'framer-motion'
 import type { Language } from '../lib/types'
 import { ui } from '../lib/i18n'
@@ -28,7 +28,7 @@ export default function GameMobileStatsSheet({
   return (
     <AnimatePresence>
       {open && (
-        <motion.div
+        <m.div
           className="fixed inset-0 z-[55] flex items-end justify-center bg-black/60 lg:hidden"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -36,7 +36,7 @@ export default function GameMobileStatsSheet({
           onClick={onBackdropClick}
           role="presentation"
         >
-          <motion.div
+          <m.div
             ref={containerRef}
             role="dialog"
             aria-modal="true"
@@ -65,8 +65,8 @@ export default function GameMobileStatsSheet({
             <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto overscroll-contain px-4 py-3">
               {children}
             </div>
-          </motion.div>
-        </motion.div>
+          </m.div>
+        </m.div>
       )}
     </AnimatePresence>
   )

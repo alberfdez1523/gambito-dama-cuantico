@@ -1,4 +1,4 @@
-import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
+import { AnimatePresence, m, useReducedMotion } from 'framer-motion'
 import { useEffect, useState } from 'react'
 import { translateGameOverInfo, ui } from '../lib/i18n'
 import type { GameOverInfo, Language } from '../lib/types'
@@ -63,7 +63,7 @@ export default function GameOverModal({
     <AnimatePresence>
       {translatedInfo && (
         collapsed ? (
-          <motion.button
+          <m.button
             key="result-chip"
             type="button"
             onClick={() => setCollapsed(false)}
@@ -76,9 +76,9 @@ export default function GameOverModal({
             <span className={`h-2 w-2 rounded-full ${translatedInfo.result === 'win' ? 'bg-emerald-400' : translatedInfo.result === 'lose' ? 'bg-red-400' : 'bg-ink-secondary'}`} />
             {translatedInfo.title}
             <GameIcon name="chevron" />
-          </motion.button>
+          </m.button>
         ) : (
-          <motion.section
+          <m.section
             key="result-panel"
             role="region"
             aria-live="assertive"
@@ -158,7 +158,7 @@ export default function GameOverModal({
                 {es ? 'Volver al inicio' : 'Back to home'}
               </button>
             </div>
-          </motion.section>
+          </m.section>
         )
       )}
     </AnimatePresence>

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
+import { AnimatePresence, m, useReducedMotion } from 'framer-motion'
 import type { AcademyProgressController } from '../../hooks/useAcademyProgress'
 import {
   ACADEMY_LESSONS,
@@ -209,7 +209,7 @@ export default function LessonScreen({
 
                   <AnimatePresence initial={false}>
                     {hintsVisible > 0 && (
-                      <motion.ol
+                      <m.ol
                         initial={reduceMotion ? false : { opacity: 0, height: 0 }}
                         animate={{ opacity: 1, height: 'auto' }}
                         exit={{ opacity: 0, height: 0 }}
@@ -222,7 +222,7 @@ export default function LessonScreen({
                             <span>{textFor(hint, language)}</span>
                           </li>
                         ))}
-                      </motion.ol>
+                      </m.ol>
                     )}
                   </AnimatePresence>
                 </div>
@@ -281,7 +281,7 @@ function ResultPanel({
   const copy = lessonCopy(language)
 
   return (
-    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="mt-7" aria-live="polite">
+    <m.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="mt-7" aria-live="polite">
       <div className={`border-l-4 p-5 sm:p-6 ${attempt.correct ? 'border-emerald-400 bg-emerald-500/[0.07]' : 'border-red-400 bg-red-500/[0.07]'}`}>
         <div className="flex items-start justify-between gap-5">
           <div>
@@ -319,7 +319,7 @@ function ResultPanel({
         </button>
         <AnimatePresence initial={false}>
           {laboratoryOpen && (
-            <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden border-t border-line">
+            <m.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden border-t border-line">
               {lesson.challenge.options.map((option, index) => (
                 <div key={index} className="grid gap-2 border-b border-line px-5 py-4 last:border-b-0 sm:grid-cols-[1fr_180px]">
                   <p className="text-sm text-ink">{textFor(option, language)}</p>
@@ -328,7 +328,7 @@ function ResultPanel({
                   </p>
                 </div>
               ))}
-            </motion.div>
+            </m.div>
           )}
         </AnimatePresence>
       </div>
@@ -348,7 +348,7 @@ function ResultPanel({
           {copy.map}
         </button>
       </div>
-    </motion.div>
+    </m.div>
   )
 }
 

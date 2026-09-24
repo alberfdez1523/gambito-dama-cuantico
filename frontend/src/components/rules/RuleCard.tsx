@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { m, AnimatePresence } from 'framer-motion'
 import type { RuleDefinition } from './types'
 import MiniBoard from './MiniBoard'
 import { useMiniSqPx } from './useMiniSqPx'
@@ -63,11 +63,11 @@ export default function RuleCard({
         aria-expanded={open}
         aria-controls={`rule-body-${rule.id}`}
       >
-        <motion.div
+        <m.div
           className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded border text-lg ${accentClass}`}
         >
           <RuleIcon icon={rule.icon} />
-        </motion.div>
+        </m.div>
         <div className="min-w-0 flex-1">
           <div className="flex items-start justify-between gap-2">
             <div>
@@ -88,7 +88,7 @@ export default function RuleCard({
 
       <AnimatePresence initial={false}>
         {open && (
-          <motion.div
+          <m.div
             id={`rule-body-${rule.id}`}
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: 'auto', opacity: 1 }}
@@ -98,7 +98,7 @@ export default function RuleCard({
           >
             <div className="border-t border-surface-4 px-4 pb-5 pt-4 lg:px-5 lg:pb-6">
               <div className="flex flex-col gap-6 lg:flex-row lg:gap-8">
-                <motion.div className="min-w-0 flex-1 space-y-4" layout>
+                <m.div className="min-w-0 flex-1 space-y-4" layout>
                   <p className="text-ui-sm leading-relaxed text-neutral-300">{rule.desc}</p>
 
                   {rule.bullets && rule.bullets.length > 0 && (
@@ -117,7 +117,7 @@ export default function RuleCard({
                       {rule.tip}
                     </p>
                   )}
-                </motion.div>
+                </m.div>
 
                 {currentStep && (
                   <div className="flex flex-shrink-0 flex-col items-center gap-3">
@@ -186,7 +186,7 @@ export default function RuleCard({
                 )}
               </div>
             </div>
-          </motion.div>
+          </m.div>
         )}
       </AnimatePresence>
     </article>

@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
-import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
+import { m, AnimatePresence, useReducedMotion } from 'framer-motion'
 import Piece from './Piece'
 import { getColorName, getPieceName, ui } from '../lib/i18n'
 import { useBoardPieceDrag, type DragGhostPiece } from '../hooks/useBoardPieceDrag'
@@ -100,7 +100,7 @@ export default function Board({
   )
 
   return (
-    <motion.div
+    <m.div
       ref={boardRef}
       className="board-root relative select-none overflow-hidden rounded-sm shadow-board ring-1 ring-white/[0.06]"
       style={{ width: 'var(--board-size)', height: 'var(--board-size)' }}
@@ -165,7 +165,7 @@ export default function Board({
             >
               <AnimatePresence initial={false} mode="popLayout">
                 {piece && (
-                  <motion.div
+                  <m.div
                     key={`${square}-${piece.color}${piece.type}`}
                     className="pointer-events-none absolute inset-0 flex items-center justify-center"
                     initial={false}
@@ -173,17 +173,17 @@ export default function Board({
                     exit={undefined}
                     transition={reduceMotion ? { duration: 0 } : { type: 'spring', stiffness: 350, damping: 20 }}
                   >
-                    <motion.div
+                    <m.div
                       className={canDrag ? 'chess-piece-draggable flex h-full w-full items-center justify-center' : 'flex h-full w-full items-center justify-center'}
                     >
                       <Piece type={piece.type} color={piece.color} animate={false} />
-                    </motion.div>
-                  </motion.div>
+                    </m.div>
+                  </m.div>
                 )}
               </AnimatePresence>
 
               {isLegal && !piece && (
-                <motion.div
+                <m.div
                   className="legal-dot pointer-events-none"
                   initial={reduceMotion ? false : { scale: 0 }}
                   animate={{ scale: 1 }}
@@ -191,7 +191,7 @@ export default function Board({
                 />
               )}
               {isLegal && piece && (
-                <motion.div
+                <m.div
                   className="legal-ring pointer-events-none absolute inset-0 m-auto"
                   initial={reduceMotion ? false : { scale: 0, opacity: 0 }}
                   animate={{ scale: 1, opacity: 1 }}
@@ -220,22 +220,22 @@ export default function Board({
 
       <AnimatePresence>
         {isThinking && (
-          <motion.div
+          <m.div
             className="pointer-events-none absolute inset-0 flex items-center justify-center"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
           >
-            <motion.div
+            <m.div
               className="rounded-full bg-surface-0/80 px-4 py-2 text-ui-sm font-medium text-accent backdrop-blur-sm"
               animate={reduceMotion ? undefined : { opacity: [0.6, 1, 0.6] }}
               transition={reduceMotion ? undefined : { repeat: Infinity, duration: 1.5 }}
             >
               {t.thinking}
-            </motion.div>
-          </motion.div>
+            </m.div>
+          </m.div>
         )}
       </AnimatePresence>
-    </motion.div>
+    </m.div>
   )
 }
