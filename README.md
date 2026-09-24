@@ -181,8 +181,9 @@ Baseline verificada de esta entrega:
 
 - 82 pruebas unitarias frontend (incluidas las de migraciones SQL).
 - 32 pruebas backend.
-- 22 recorridos E2E en Chromium, más dos pruebas PWA de producción y una de gates apagados.
-- Entrada crítica de ~116 kB gzip (JS + CSS); precarga PWA de ~945 kB.
+- 27 recorridos E2E en Chromium (incluye 5 auditorías axe WCAG 2.1 AA), más dos pruebas PWA de producción y una de gates apagados.
+- Entrada crítica de ~118 kB gzip (JS + CSS); precarga PWA de ~945 kB.
+- `npm audit`: 0 vulnerabilidades.
 
 ## Estado de lanzamiento
 

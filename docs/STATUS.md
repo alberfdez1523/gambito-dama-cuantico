@@ -36,8 +36,8 @@ Fecha de corte: 24 de septiembre de 2026.
 - `npm ci`: lockfile reproducible.
 - Frontend: ESLint sin avisos, typecheck y 82 pruebas unitarias (incluye la aplicación de todas las migraciones sobre PGlite y las políticas del lobby).
 - Backend: ruff y 32 pruebas (incluye path traversal, límite de peticiones y límites de payload cuántico).
-- E2E: 22 recorridos en Chromium, más dos pruebas PWA de producción y una de gates apagados. La matriz Firefox/WebKit se mantiene en `npm run e2e`, pero no se ha vuelto a ejecutar tras estos cambios.
-- Build: entrada crítica ~116 kB gzip (JS + CSS), vigilada en CI con un presupuesto de 150 kB; precarga PWA ~945 kB.
+- E2E: 27 recorridos en Chromium (5 son auditorías axe WCAG 2.1 AA), más dos pruebas PWA de producción y una de gates apagados. La matriz Firefox/WebKit se mantiene en `npm run e2e`, pero no se ha vuelto a ejecutar tras estos cambios.
+- Build: entrada crítica ~118 kB gzip (JS + CSS), vigilada en CI con un presupuesto de 150 kB; precarga PWA ~945 kB.
 - Docker: la imagen se construye y sirve la app como usuario sin privilegios; el build falla si Stockfish no tiene su red NNUE.
 
 No se declara listo el competitivo: las pruebas locales validan el código entregado, pero no sustituyen aplicar las migraciones, carga real ni beta operativa.
